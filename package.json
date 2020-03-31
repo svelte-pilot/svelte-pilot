@@ -1,0 +1,56 @@
+{
+  "name": "svelte-pilot",
+  "version": "0.16.2",
+  "description": "A svelte router with the power of history.state",
+  "main": "dist/svelte-pilot",
+  "scripts": {
+    "build": "rollup -c rollup.config.esm.js && rollup -c rollup.config.cjs.js && rollup -c rollup.config.esm.bundle.js",
+    "example": "ws --spa example.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiangfengming/svelte-pilot.git"
+  },
+  "keywords": [
+    "svelte",
+    "router"
+  ],
+  "author": "Jiang Fengming <jiangfengming87@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/jiangfengming/svelte-pilot#readme",
+  "bugs": {
+    "url": "https://github.com/jiangfengming/svelte-pilot/issues"
+  },
+  "dependencies": {
+    "cast-string": "^0.3.0",
+    "spa-history": "^0.12.5",
+    "url-router": "^11.0.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.7.5",
+    "@babel/preset-env": "^7.7.6",
+    "eslint": "^6.7.2",
+    "eslint-config-enough": "^0.3.8",
+    "local-web-server": "^3.0.7",
+    "rollup": "^1.27.12",
+    "rollup-plugin-babel": "^4.3.3",
+    "rollup-plugin-node-resolve": "^5.2.0"
+  },
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "loose": true,
+          "modules": false
+        }
+      ]
+    ]
+  },
+  "eslintConfig": {
+    "extends": "enough",
+    "env": {
+      "browser": true
+    }
+  }
+}
