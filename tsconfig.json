@@ -1,0 +1,11 @@
+{
+  "include": ["src/**/*"],
+
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["ES2020", "DOM"],
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "outDir": "dist"
+  }
+}

@@ -1,6 +1,9 @@
 {
+  "parser": "@typescript-eslint/parser",
+
   "extends": [
-    "enough"
+    "enough",
+    "plugin:@typescript-eslint/recommended"
   ],
 
   "env": {
@@ -9,7 +12,7 @@
   },
 
   "plugins": [
-    "ext",
+    "@typescript-eslint",
     "svelte3"
   ],
 
@@ -21,7 +24,6 @@
   ],
 
   "rules": {
-    "ext/lines-between-object-properties": ["error", "always", { "exceptBetweenSingleLines": true }],
     "no-multiple-empty-lines": ["error", { "max": 1, "maxBOF": 2, "maxEOF": 1 }]
   }
 }
