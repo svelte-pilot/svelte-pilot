@@ -89,6 +89,8 @@ export class HookInterrupt extends Error {
 }
 
 export default class Router {
+  private base?: string
+
   private pathParam?: string
 
   private urlRouter: UrlRouter<RouterViewDefStacks>
@@ -97,9 +99,13 @@ export default class Router {
 
   private beforeCurrentLeaveHooks: Hook[] = []
 
-  private preloadData?: SerializableObject
+  private onPopStateWrapper: () => void
 
-  route: Route = {
+  preloadData?: SerializableObject
+
+  routerViewRoot?: RouterViewResolved
+
+  current: Route = {
     path: '',
     query: new StringCaster({}),
     hash: '',
@@ -111,18 +117,28 @@ export default class Router {
 
   constructor({
     routes,
+    base,
     pathParam,
     preloadData
   }: {
     routes: RouterViewDefGroup,
+    base?: string,
     pathParam?: string,
     preloadData?: SerializableObject
   }) {
     this.urlRouter = new UrlRouter(this.flatRoutes(routes));
+    this.base = base;
     this.pathParam = pathParam;
     this.preloadData = preloadData;
+    this.onPopStateWrapper = () => this.onPopState();
 
     if (IS_CLIENT) {
+      window.addEventListener('popstate', this.onPopStateWrapper);
+
+      if (!history.state?.__position__) {
+        history.replaceState({ __position__: history.length }, '');
+      }
+
       this.handle({
         path: location.href,
         state: history.state
@@ -159,12 +175,16 @@ export default class Router {
     return result;
   }
 
-  handle(location: string | Location): Promise<Route> {
-    const url = this.toURL(location);
-    const path = this.pathParam ? url.searchParams.get(this.pathParam) || '/' : url.pathname;
-    const found = this.urlRouter.find(path);
+  handle(location: string | Location): Promise<Route | null> {
+    return new Promise(resolve => {
+      const url = this.toURL(location);
+      const path = this.pathParam ? url.searchParams.get(this.pathParam) || '/' : url.pathname;
+      const found = this.urlRouter.find(path);
 
-    if (found) {
+      if (!found) {
+        return resolve(null);
+      }
+
       const {
         routerViewRoot,
         metaParams,
@@ -185,49 +205,62 @@ export default class Router {
 
       this.assignMeta(to, metaParams);
 
-      const hooks = this.beforeCurrentLeaveHooks.concat(this.beforeChangeHooks, beforeEnterHooks);
-
-      let promise = Promise.resolve(true);
-
-      for (const hook of hooks) {
-        promise = promise.then(() =>
-          Promise.resolve(hook(to, this.route)).then(result => {
-            if (result === true || result === undefined) {
-              return true;
-            } else if (result === false) {
-              throw new HookInterrupt();
-            } else {
-              throw new HookInterrupt(result);
-            }
-          })
-        );
-      }
-
-      promise = promise.then(
+      this.runHooks(
+        this.beforeCurrentLeaveHooks.concat(this.beforeChangeHooks, beforeEnterHooks),
+        to,
         () =>
-          Promise.all(asyncComponentPromises).then(modules => {
-            const hooks = modules.filter(m => m.beforeEnter).map(m => m.beforeEnter);
+          Promise.all(asyncComponentPromises).then(modules =>
+            this.runHooks(
+              modules.filter(m => m.beforeEnter).map(m => m.beforeEnter),
+              to,
+              () => {
+                this.current = to;
+                this.routerViewRoot = routerViewRoot;
+                this.beforeCurrentLeaveHooks = beforeLeaveHooks;
 
-          })
-        ,
+                if (IS_SERVER) {
+                  this.preload();
+                }
+              }
+            )
+          )
+      )
+    });
+  }
 
-        e => {
-          if (e instanceof HookInterrupt) {
-            if (e.location) {
-              return this.handle(e.location);
-            } else {
-              return false;
-            }
+  private runHooks(hooks: Hook[], to: Route, then: () => Promise<boolean>): Promise<boolean> {
+    let promise = Promise.resolve(true);
+
+    for (const hook of hooks) {
+      promise = promise.then(() =>
+        Promise.resolve(hook(to, this.current)).then(result => {
+          if (result === true || result === undefined) {
+            return true;
+          } else if (result === false) {
+            throw new HookInterrupt();
           } else {
-            throw e;
+            throw new HookInterrupt(result);
           }
-        }
+        })
       );
-
-      if (IS_SERVER) {
-        this.preload();
-      }
     }
+
+    promise = promise.then(
+      then,
+      e => {
+        if (e instanceof HookInterrupt) {
+          if (e.location) {
+            return this.handle(e.location);
+          } else {
+            return false;
+          }
+        } else {
+          throw e;
+        }
+      }
+    );
+
+    return promise;
   }
 
   private toURL(location: string | Location) {
@@ -298,14 +331,6 @@ export default class Router {
     stack.forEach(({ name = 'default', component, props, meta, beforeEnter, beforeLeave, children }) => {
       const routerView: RouterViewResolved = routerViews[name] = { name, props };
 
-      if (component instanceof Function) {
-        const promise = component();
-        promise.then(m => routerView.component = m);
-        asyncComponentPromises.push(promise);
-      } else {
-        routerView.component = component;
-      }
-
       if (beforeEnter) {
         beforeEnterHooks.push(beforeEnter);
       }
@@ -316,6 +341,18 @@ export default class Router {
 
       if (meta) {
         metaParams.push(meta);
+      }
+
+      if (component instanceof Function) {
+        const promise = component();
+        promise.then(m => routerView.component = m);
+        asyncComponentPromises.push(promise);
+      } else {
+        routerView.component = component;
+
+        if (component?.beforeEnter) {
+          beforeEnterHooks.push(component.beforeEnter);
+        }
       }
 
       if (children) {
@@ -343,131 +380,75 @@ export default class Router {
 
   }
 
-  push(location: string | Location): Promise<Route> {
-    return this.handle(location).then(route => {
+  setState(state: SerializableObject): void {
+    if (this.current) {
+      Object.assign(this.current.state, state);
+
       if (IS_CLIENT) {
-        history.pushState(route.state, '', route.fullPath);
+        history.replaceState(this.current.state, '');
       }
-
-      return route;
-    });
-  }
-
-  replace(location: string | Location): Promise<Route> {
-    return this.handle(location).then(route => {
-      if (IS_CLIENT) {
-        history.replaceState(route.state, '', route.fullPath);
-      }
-
-      return route;
-    });
-  }
-
-  _setMeta(route) {
-    route.meta = {};
-
-    if (route._meta.length) {
-      route._meta.forEach(m => Object.assign(route.meta, m instanceof Function ? m(route) : m));
     }
   }
 
-  setState(state) {
-    this.history.setState(state);
-
-    // Vue can not react if add new props into an existing object
-    // so we replace it with a new state object
-    this.current.state = Object.assign({}, this.history.current.state);
-
-    // meta factory function may use state object to generate meta object
-    // so we need to re-generate a new meta
-    this._setMeta(this.current);
+  push(location: string | Location): void {
+    this.handle(location).then(route => {
+      if (IS_CLIENT && route) {
+        history.pushState({ ...route.state, __position__: history.state.__position__ + 1 }, '', route.fullPath);
+      }
+    });
   }
 
-  beforeChange(hook) {
-    this._beforeChangeHooks.push(hook.bind(this));
+  replace(location: string | Location): void {
+    this.handle(location).then(route => {
+      if (IS_CLIENT && route) {
+        history.replaceState({ ...route.state, __position__: history.state.__position }, '', route.fullPath);
+      }
+    });
   }
 
-  _beforeChange(to, from, action) {
-    const route = to.route = {
-      path: to.path,
-      fullPath: to.fullPath,
-      url: to.url,
-      query: to.query,
-      hash: to.hash,
-      state: to.state,
-      meta: {},
-      params: null,
-      routerViews: null,
-      _meta: [],
-      _beforeEnter: [],
-      _beforeLeave: []
+  private onPopState(state?: SerializableObject): void {
+    this.handle({
+      path: location.href,
+      state: { ...history.state, ...state }
+    }).then(route => {
+      if (route) {
+        if (state) {
+          history.replaceState(route.state, '');
+        }
+      } else {
+        this.silentGo(<number> this.current.state.__position__ - history.state.__position__);
+      }
+    });
+  }
+
+  private silentGo(delta: number, callback?: () => void): void {
+    const onPopState = () => {
+      window.removeEventListener('popstate', onPopState);
+      window.addEventListener('popstate', this.onPopStateWrapper);
+
+      if (callback) {
+        callback();
+      }
     };
 
-    const _route = this.urlRouter.find(to.path);
-
-    if (_route) {
-      this.resolveRoute(route, _route);
-    }
-
-    const hooks = this.current._beforeLeave.concat(to.route._beforeEnter, this._beforeChangeHooks);
-
-    if (!hooks.length) {
-      return true;
-    }
-
-    let promise = Promise.resolve(true);
-
-    hooks.forEach(hook =>
-      promise = promise.then(() =>
-        Promise.resolve(hook(route, this.current, action, this)).then(result => {
-          // if the hook abort or redirect the navigation, cancel the promise chain.
-          if (result !== undefined && result !== true) {
-            throw result;
-          }
-        })
-      )
-    );
-
-    return promise.catch(e => {
-      if (e instanceof Error) {
-        // encountered unexpected error
-        throw e;
-      } else {
-        // abort or redirect
-        return e;
-      }
-    });
+    window.removeEventListener('popstate', this.onPopStateWrapper);
+    window.addEventListener('popstate', onPopState);
+    history.go(delta);
   }
 
-  afterChange(hook) {
-    this._afterChangeHooks.push(hook.bind(this));
+  go(delta: number, state?: SerializableObject): void {
+    if (state) {
+      this.silentGo(delta, () => this.onPopState(state));
+    } else {
+      history.go(delta);
+    }
   }
 
-  _afterChange(to, from, action) {
-    let promise = Promise.resolve(true);
+  back(state?: SerializableObject): void {
+    return this.go(-1, state);
+  }
 
-    this._afterChangeHooks.forEach(hook =>
-      promise = promise.then(() =>
-        Promise.resolve(hook(to.route, this.current, action, this)).then(result => {
-          if (result === false) {
-            throw result;
-          }
-        })
-      )
-    );
-
-    promise.catch(e => {
-      if (e instanceof Error) {
-        // encountered unexpected error
-        throw e;
-      } else {
-        // abort or redirect
-        return e;
-      }
-    }).then(v => {
-      if (v !== false) {
-        Object.assign(this.current, to.route);
-      }
-    });
+  forward(state?: SerializableObject): void {
+    return this.go(1, state);
   }
 }
