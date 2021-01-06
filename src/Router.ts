@@ -359,7 +359,9 @@ export default class Router {
   ): Record<string, RouterViewResolved> {
     const routerViews: Record<string, RouterViewResolved> = {};
 
-    stack.forEach(({ name = 'default', component, props, meta, beforeEnter, beforeLeave, children }) => {
+    stack.forEach(routerViewDef => {
+      const { name = 'default', component, props, meta, beforeEnter, beforeLeave, children } = routerViewDef;
+
       const routerView: RouterViewResolved = routerViews[name] = { name, props };
 
       if (beforeEnter) {
@@ -376,7 +378,7 @@ export default class Router {
 
       if (component instanceof Function) {
         const promise = component();
-        promise.then(m => routerView.component = m);
+        promise.then(m => routerViewDef.component = routerView.component = m);
         asyncComponentPromises.push(promise);
       } else {
         routerView.component = component;
