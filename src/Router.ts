@@ -55,7 +55,7 @@ type Route = {
   state: SerializableObject,
   params: StringCaster,
   meta: SerializableObject,
-  fullPath: string
+  href: string
 };
 
 type Hook = (to: Route, from: Route) => undefined | boolean | string | Location;
@@ -112,7 +112,7 @@ export default class Router {
     state: {},
     params: new StringCaster({}),
     meta: {},
-    fullPath: ''
+    href: ''
   }
 
   constructor({
@@ -176,13 +176,12 @@ export default class Router {
   }
 
   handle(location: string | Location): Promise<Route | null> {
-    return new Promise(resolve => {
-      const url = this.toURL(location);
-      const path = this.pathParam ? url.searchParams.get(this.pathParam) || '/' : url.pathname;
-      const found = this.urlRouter.find(path);
+    return Promise.resolve().then(() => {
+      const url = this.locationToInternalURL(location);
+      const matchedURLRoute = this.urlRouter.find(url.pathname);
 
-      if (!found) {
-        return resolve(null);
+      if (!matchedURLRoute) {
+        return null;
       }
 
       const {
@@ -191,21 +190,21 @@ export default class Router {
         beforeEnterHooks,
         beforeLeaveHooks,
         asyncComponentPromises
-      } = this.resolveRoute(found.handler);
+      } = this.resolveRoute(matchedURLRoute.handler);
 
       const to: Route = {
         path: url.pathname,
         query: new StringCaster(url.searchParams),
         hash: url.hash,
         state: typeof location === 'string' || !location.state ? {} : location.state,
-        params: new StringCaster(found.params),
+        params: new StringCaster(matchedURLRoute.params),
         meta: {},
-        fullPath: url.pathname + url.search + url.hash
+        href: this.internalURLtoHref(url)
       };
 
       this.assignMeta(to, metaParams);
 
-      this.runHooks(
+      return this.runHooks(
         this.beforeCurrentLeaveHooks.concat(this.beforeChangeHooks, beforeEnterHooks),
         to,
         () =>
@@ -219,23 +218,74 @@ export default class Router {
                 this.beforeCurrentLeaveHooks = beforeLeaveHooks;
 
                 if (IS_SERVER) {
-                  this.preload();
+                  return this.preload().then(() => to);
+                } else {
+                  return to;
                 }
               }
             )
           )
-      )
+      );
     });
   }
 
-  private runHooks(hooks: Hook[], to: Route, then: () => Promise<boolean>): Promise<boolean> {
-    let promise = Promise.resolve(true);
+  private locationToInternalURL(location: string | Location) {
+    if (typeof location === 'string') {
+      location = { path: location };
+    }
+
+    const url = new URL(location.path, 'file:');
+
+    if (location.query) {
+      appendSearchParams(url.searchParams, location.query);
+    }
+
+    if (location.hash) {
+      url.hash = location.hash;
+    }
+
+    // `base` and `pathParam` only has effect on absolute URL.
+    // `base` and `pathParam` are mutually exclusive.
+    if (/^\w+:/.test(location.path)) {
+      if (this.base && url.pathname.startsWith(this.base)) {
+        url.pathname = url.pathname.slice(this.base.length);
+      } else if (this.pathParam) {
+        url.pathname = url.searchParams.get(this.pathParam) || '/';
+      }
+    }
+
+    return url;
+  }
+
+  // If `base` is not ends with '/', and path is root ('/'), the ending slash will be trimmed.
+  private internalURLtoHref(url: URL) {
+    if (this.pathParam) {
+      return url.search + url.hash;
+    } else {
+      return (
+        this.base
+          ? this.base.endsWith('/')
+            ? this.base + url.pathname.slice(1)
+            : url.pathname === '/'
+              ? this.base
+              : this.base + url.pathname
+          : url.pathname
+      ) + url.search + url.hash;
+    }
+  }
+
+  toHref(location: string | Location) {
+    return this.internalURLtoHref(this.locationToInternalURL(location));
+  }
+
+  private runHooks(hooks: Hook[], to: Route, onFulfilled: () => Route | null | Promise<Route | null>) {
+    let promise: Promise<Route | null> = Promise.resolve(null);
 
     for (const hook of hooks) {
       promise = promise.then(() =>
         Promise.resolve(hook(to, this.current)).then(result => {
           if (result === true || result === undefined) {
-            return true;
+            return null;
           } else if (result === false) {
             throw new HookInterrupt();
           } else {
@@ -246,13 +296,13 @@ export default class Router {
     }
 
     promise = promise.then(
-      then,
+      onFulfilled,
       e => {
         if (e instanceof HookInterrupt) {
           if (e.location) {
             return this.handle(e.location);
           } else {
-            return false;
+            return null;
           }
         } else {
           throw e;
@@ -261,25 +311,6 @@ export default class Router {
     );
 
     return promise;
-  }
-
-  private toURL(location: string | Location) {
-    if (typeof location === 'string') {
-      return new URL(location, 'file:');
-    } else {
-      const loc = location as Location;
-      const url = new URL(loc.path, 'file:');
-
-      if (loc.query) {
-        appendSearchParams(url.searchParams, loc.query);
-      }
-
-      if (loc.hash) {
-        url.hash = loc.hash;
-      }
-
-      return url;
-    }
   }
 
   private resolveRoute(stacks: RouterViewDef[][]) {
@@ -393,7 +424,7 @@ export default class Router {
   push(location: string | Location): void {
     this.handle(location).then(route => {
       if (IS_CLIENT && route) {
-        history.pushState({ ...route.state, __position__: history.state.__position__ + 1 }, '', route.fullPath);
+        history.pushState({ ...route.state, __position__: history.state.__position__ + 1 }, '', route.href);
       }
     });
   }
@@ -401,7 +432,7 @@ export default class Router {
   replace(location: string | Location): void {
     this.handle(location).then(route => {
       if (IS_CLIENT && route) {
-        history.replaceState({ ...route.state, __position__: history.state.__position }, '', route.fullPath);
+        history.replaceState({ ...route.state, __position__: history.state.__position }, '', route.href);
       }
     });
   }
