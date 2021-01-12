@@ -32,12 +32,12 @@
     "url-router": "^12.0.0"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^4.12.0",
-    "@typescript-eslint/parser": "^4.12.0",
+    "@typescript-eslint/eslint-plugin": "^4.13.0",
+    "@typescript-eslint/parser": "^4.13.0",
     "eslint": "^7.17.0",
     "eslint-config-enough": "^0.7.0",
     "eslint-plugin-svelte3": "^3.0.0",
-    "rollup": "^2.36.0",
+    "rollup": "^2.36.1",
     "svelte": "^3.31.2",
     "typescript": "^4.1.3"
   }

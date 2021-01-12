@@ -11,12 +11,20 @@ type SerializableObject = Record<string, SerializableData>;
 
 type SyncComponent = SvelteComponent | {
   default: SvelteComponent,
-  preload?: (props: SerializableObject) => Promise<SerializableObject>,
+  preload?: PreloadFn,
   beforeEnter?: Hook
 };
 
 type AsyncComponent = () => Promise<SyncComponent>;
 type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
+
+type PreloadData = {
+  data?: SerializableObject,
+  children?: Record<string, PreloadData>
+};
+
+type PreloadFn = (props: SerializableObject) => Promise<SerializableObject>;
+type PreloadFnWrapper = (route: Route) => Promise<SerializableObject>;
 
 type RouterViewDef = {
   name?: string,
@@ -39,6 +47,7 @@ type RouterViewResolved = {
   children?: Record<string, RouterViewResolved>
 };
 
+
 type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
 
 type Location = {
@@ -60,8 +69,9 @@ type Route = {
 
 type Hook = (to: Route, from: Route) => undefined | boolean | string | Location;
 
-const IS_CLIENT = typeof window === 'object';
-const IS_SERVER = !IS_CLIENT;
+type Mode = 'server' | 'client';
+
+const detectedMode = typeof window === 'object' ? 'client' : 'server';
 
 function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
   if (q instanceof URLSearchParams) {
@@ -76,6 +86,16 @@ function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
         }
       }
     });
+  }
+}
+
+function computeProps(route: Route, props?: RouteProps) {
+  if (!props) {
+    return {};
+  } else if (props instanceof Function) {
+    return props(route);
+  } else {
+    return props;
   }
 }
 
@@ -101,6 +121,8 @@ export default class Router {
 
   private onPopStateWrapper: () => void
 
+  mode?: Mode
+
   preloadData?: SerializableObject
 
   routerViewRoot?: RouterViewResolved
@@ -119,20 +141,23 @@ export default class Router {
     routes,
     base,
     pathParam,
+    mode = detectedMode,
     preloadData
   }: {
     routes: RouterViewDefGroup,
     base?: string,
     pathParam?: string,
+    mode: Mode,
     preloadData?: SerializableObject
   }) {
     this.urlRouter = new UrlRouter(this.flatRoutes(routes));
     this.base = base;
     this.pathParam = pathParam;
+    this.mode = mode;
     this.preloadData = preloadData;
     this.onPopStateWrapper = () => this.onPopState();
 
-    if (IS_CLIENT) {
+    if (this.mode === 'client') {
       window.addEventListener('popstate', this.onPopStateWrapper);
 
       if (!history.state?.__position__) {
@@ -189,7 +214,9 @@ export default class Router {
         metaParams,
         beforeEnterHooks,
         beforeLeaveHooks,
-        asyncComponentPromises
+        asyncComponentPromises,
+        preloadFns,
+        preloadData
       } = this.resolveRoute(matchedURLRoute.handler);
 
       const to: Route = {
@@ -213,14 +240,24 @@ export default class Router {
               modules.filter(m => m.beforeEnter).map(m => m.beforeEnter),
               to,
               () => {
-                this.current = to;
-                this.routerViewRoot = routerViewRoot;
-                this.beforeCurrentLeaveHooks = beforeLeaveHooks;
-
-                if (IS_SERVER) {
-                  return this.preload().then(() => to);
+                if (this.mode === 'server') {
+                  return Promise.all(
+                    preloadFns.map(preload => preload(to))
+                  ).then(() => ({
+                    route: to,
+                    routerViewRoot,
+                    preloadData
+                  }));
                 } else {
-                  return to;
+                  this.current = to;
+                  this.routerViewRoot = routerViewRoot;
+                  this.beforeCurrentLeaveHooks = beforeLeaveHooks;
+
+                  return {
+                    route: to,
+                    routerViewRoot,
+                    preloadData: null
+                  };
                 }
               }
             )
@@ -314,54 +351,56 @@ export default class Router {
   }
 
   private resolveRoute(stacks: RouterViewDef[][]) {
+    const rootWrapper: Record<string, RouterViewResolved> = {};
     const metaParams: RouteProps[] = [];
     const beforeEnterHooks: Hook[] = [];
     const beforeLeaveHooks: Hook[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
-    let root: RouterViewResolved | undefined;
-    let linkView: RouterViewResolved | undefined;
+    const preloadFns: PreloadFnWrapper[] = [];
+    const preloadData: PreloadData = {};
+    let children = rootWrapper;
 
     for (const stack of stacks) {
-      const linkViewName = stack[stack.length - 1].name || 'default';
-
-      const routerViews = this.resolveRouterViews(
+      this.resolveRouterViews(
         stack,
+        true,
+        children,
         metaParams,
         beforeEnterHooks,
         beforeLeaveHooks,
-        asyncComponentPromises
+        asyncComponentPromises,
+        preloadFns,
+        preloadData
       );
 
-      if (!root || !linkView) { // !linkView to make stupid TS happy
-        root = routerViews[0];
-        linkView = root;
-      } else {
-        linkView.children = routerViews;
-        linkView = routerViews[linkViewName];
-      }
+      const linkViewName = stack[stack.length - 1].name || 'default';
+      children = children[linkViewName].children = {};
     }
 
     return {
-      routerViewRoot: root,
+      routerViewRoot: rootWrapper.default,
       metaParams,
       beforeEnterHooks,
       beforeLeaveHooks,
-      asyncComponentPromises
+      asyncComponentPromises,
+      preloadFns,
+      preloadData
     };
   }
 
   private resolveRouterViews(
     stack: RouterViewDef[],
+    skipLastViewChildren: boolean,
+    routerViews: Record<string, RouterViewResolved>,
     metaParams: RouteProps[],
     beforeEnterHooks: Hook[],
     beforeLeaveHooks: Hook[],
-    asyncComponentPromises: Promise<SyncComponent>[]
-  ): Record<string, RouterViewResolved> {
-    const routerViews: Record<string, RouterViewResolved> = {};
-
+    asyncComponentPromises: Promise<SyncComponent>[],
+    preloadFns: PreloadFnWrapper[],
+    preloadData: PreloadData
+  ): void {
     stack.forEach(routerViewDef => {
       const { name = 'default', component, props, meta, beforeEnter, beforeLeave, children } = routerViewDef;
-
       const routerView: RouterViewResolved = routerViews[name] = { name, props };
 
       if (beforeEnter) {
@@ -378,7 +417,15 @@ export default class Router {
 
       if (component instanceof Function) {
         const promise = component();
-        promise.then(m => routerViewDef.component = routerView.component = m);
+
+        promise.then(component => {
+          routerViewDef.component = routerView.component = component;
+
+          if (component.preload && this.mode === 'server') {
+            pushPreloadFn(component.preload);
+          }
+        });
+
         asyncComponentPromises.push(promise);
       } else {
         routerView.component = component;
@@ -386,20 +433,34 @@ export default class Router {
         if (component?.beforeEnter) {
           beforeEnterHooks.push(component.beforeEnter);
         }
+
+        if (component?.preload && this.mode === 'server') {
+          pushPreloadFn(component.preload);
+        }
       }
 
-      if (children) {
-        routerView.children = this.resolveRouterViews(
+      function pushPreloadFn(preload: PreloadFn) {
+        preloadFns.push(
+          route => preload(computeProps(route, props)).then(data => preloadData.data = data)
+        );
+      }
+
+      if (children && (!skipLastViewChildren || routerViewDef !== stack[stack.length - 1])) {
+        routerView.children = {};
+
+        this.resolveRouterViews(
           children.filter((v): v is RouterViewDef => !(v instanceof Array) && !v.path),
+          false,
+          routerView.children,
           metaParams,
           beforeEnterHooks,
           beforeLeaveHooks,
-          asyncComponentPromises
+          asyncComponentPromises,
+          preloadFns,
+          this.mode === 'server' ? preloadData.children = {} : {}
         );
       }
     });
-
-    return routerViews;
   }
 
   private assignMeta(route: Route, metaParams: RouteProps[]) {
@@ -409,15 +470,11 @@ export default class Router {
     route.meta = meta;
   }
 
-  private preload(): Promise<void> {
-
-  }
-
   setState(state: SerializableObject): void {
     if (this.current) {
       Object.assign(this.current.state, state);
 
-      if (IS_CLIENT) {
+      if (this.mode === 'client') {
         history.replaceState(this.current.state, '');
       }
     }
@@ -425,7 +482,7 @@ export default class Router {
 
   push(location: string | Location): void {
     this.handle(location).then(route => {
-      if (IS_CLIENT && route) {
+      if (this.mode === 'client' && route) {
         history.pushState({ ...route.state, __position__: history.state.__position__ + 1 }, '', route.href);
       }
     });
@@ -433,7 +490,7 @@ export default class Router {
 
   replace(location: string | Location): void {
     this.handle(location).then(route => {
-      if (IS_CLIENT && route) {
+      if (this.mode === 'client' && route) {
         history.replaceState({ ...route.state, __position__: history.state.__position }, '', route.href);
       }
     });
