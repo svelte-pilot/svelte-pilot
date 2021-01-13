@@ -23,8 +23,8 @@ type PreloadData = {
   children?: Record<string, PreloadData>
 };
 
-type PreloadFn = (props: SerializableObject) => Promise<SerializableObject>;
-type PreloadFnWrapper = (route: Route) => Promise<SerializableObject>;
+type PreloadFn = (props: SerializableObject, serverContext: any) => Promise<SerializableObject>;
+type PreloadFnWrapper = (route: Route, serverContext: any) => Promise<SerializableObject>;
 
 type RouterViewDef = {
   name?: string,
@@ -70,6 +70,12 @@ type Route = {
 type Hook = (to: Route, from: Route) => undefined | boolean | string | Location;
 
 type Mode = 'server' | 'client';
+
+type HandlerResult = {
+  route: Route,
+  routerViewRoot: RouterViewResolved,
+  preloadData: PreloadData | null
+} | null;
 
 const detectedMode = typeof window === 'object' ? 'client' : 'server';
 
@@ -200,7 +206,7 @@ export default class Router {
     return result;
   }
 
-  handle(location: string | Location): Promise<Route | null> {
+  handle(location: string | Location, serverContext?: any): Promise<HandlerResult> {
     return Promise.resolve().then(() => {
       const url = this.locationToInternalURL(location);
       const matchedURLRoute = this.urlRouter.find(url.pathname);
@@ -242,7 +248,7 @@ export default class Router {
               () => {
                 if (this.mode === 'server') {
                   return Promise.all(
-                    preloadFns.map(preload => preload(to))
+                    preloadFns.map(preload => preload(to, serverContext))
                   ).then(() => ({
                     route: to,
                     routerViewRoot,
@@ -315,8 +321,8 @@ export default class Router {
     return this.internalURLtoHref(this.locationToInternalURL(location));
   }
 
-  private runHooks(hooks: Hook[], to: Route, onFulfilled: () => Route | null | Promise<Route | null>) {
-    let promise: Promise<Route | null> = Promise.resolve(null);
+  private runHooks(hooks: Hook[], to: Route, onFulfilled: () => HandlerResult | Promise<HandlerResult>) {
+    let promise: Promise<HandlerResult> = Promise.resolve(null);
 
     for (const hook of hooks) {
       promise = promise.then(() =>
@@ -357,7 +363,7 @@ export default class Router {
     const beforeLeaveHooks: Hook[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
     const preloadFns: PreloadFnWrapper[] = [];
-    const preloadData: PreloadData = {};
+    const preloadData: PreloadData | null = this.mode === 'server' ? {} : null;
     let children = rootWrapper;
 
     for (const stack of stacks) {
@@ -397,7 +403,7 @@ export default class Router {
     beforeLeaveHooks: Hook[],
     asyncComponentPromises: Promise<SyncComponent>[],
     preloadFns: PreloadFnWrapper[],
-    preloadData: PreloadData
+    preloadData: PreloadData | null
   ): void {
     stack.forEach(routerViewDef => {
       const { name = 'default', component, props, meta, beforeEnter, beforeLeave, children } = routerViewDef;
@@ -421,8 +427,8 @@ export default class Router {
         promise.then(component => {
           routerViewDef.component = routerView.component = component;
 
-          if (component.preload && this.mode === 'server') {
-            pushPreloadFn(component.preload);
+          if (component.preload && preloadData) {
+            pushPreloadFn(component.preload, preloadData);
           }
         });
 
@@ -434,14 +440,14 @@ export default class Router {
           beforeEnterHooks.push(component.beforeEnter);
         }
 
-        if (component?.preload && this.mode === 'server') {
-          pushPreloadFn(component.preload);
+        if (component?.preload && preloadData) {
+          pushPreloadFn(component.preload, preloadData);
         }
       }
 
-      function pushPreloadFn(preload: PreloadFn) {
+      function pushPreloadFn(preload: PreloadFn, preloadData: PreloadData) {
         preloadFns.push(
-          route => preload(computeProps(route, props)).then(data => preloadData.data = data)
+          (route, ctx) => preload(computeProps(route, props), ctx).then(data => preloadData.data = data)
         );
       }
 
@@ -457,7 +463,7 @@ export default class Router {
           beforeLeaveHooks,
           asyncComponentPromises,
           preloadFns,
-          this.mode === 'server' ? preloadData.children = {} : {}
+          preloadData ? preloadData.children = {} : null
         );
       }
     });
@@ -481,17 +487,31 @@ export default class Router {
   }
 
   push(location: string | Location): void {
-    this.handle(location).then(route => {
-      if (this.mode === 'client' && route) {
-        history.pushState({ ...route.state, __position__: history.state.__position__ + 1 }, '', route.href);
+    this.handle(location).then(result => {
+      if (this.mode === 'client' && result) {
+        history.pushState(
+          {
+            ...result.route.state,
+            __position__: history.state.__position__ + 1
+          },
+          '',
+          result.route.href
+        );
       }
     });
   }
 
   replace(location: string | Location): void {
-    this.handle(location).then(route => {
-      if (this.mode === 'client' && route) {
-        history.replaceState({ ...route.state, __position__: history.state.__position }, '', route.href);
+    this.handle(location).then(result => {
+      if (this.mode === 'client' && result) {
+        history.replaceState(
+          {
+            ...result.route.state,
+            __position__: history.state.__position
+          },
+          '',
+          result.route.href
+        );
       }
     });
   }
@@ -500,10 +520,10 @@ export default class Router {
     this.handle({
       path: location.href,
       state: { ...history.state, ...state }
-    }).then(route => {
-      if (route) {
+    }).then(result => {
+      if (result) {
         if (state) {
-          history.replaceState(route.state, '');
+          history.replaceState(result.route.state, '');
         }
       } else {
         this.silentGo(<number> this.current.state.__position__ - history.state.__position__);

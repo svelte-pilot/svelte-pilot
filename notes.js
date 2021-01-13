@@ -5,8 +5,8 @@ import { Router, ServerApp } from 'svelte-pilot';
 
 const router = new Router();
 
-async function handleRequest(url) {
-  const { route, routerViewRoot, preloadData } = await router.handle(url);
+async function handleRequest(url, serverContext) {
+  const { route, routerViewRoot, preloadData } = await router.handle(url, serverContext);
 
   if ([].includes(route.meta.status)) {
 
@@ -32,21 +32,18 @@ export default handleRequest;
 const handleRequest = require('/path/to/server-bundle.js');
 
 
-
-
 // ------------------------------------
 
 // client-entry.js
 import { Router, ClientApp } from 'svelte-pilot';
 
-const router = new Router({
-  preloadData: window.preloadData
-});
-
-window.preloadData = null;
+const router = new Router();
 
 new ClientApp({
   props: {
-    router
+    router,
+    preloadData: window.preloadData
   }
 });
+
+window.preloadData = null;
