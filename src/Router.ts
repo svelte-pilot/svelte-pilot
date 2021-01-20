@@ -75,7 +75,13 @@ export type Route = {
   _keySetters: KeyFn[]
 };
 
-type GuardHook = (to: Route, from?: Route) => undefined | boolean | string | Location;
+type GuardHookResult = void | boolean | string | Location;
+
+type GuardHook = {
+  (to: Route, from?: Route): GuardHookResult | Promise<GuardHookResult>,
+  _beforeChangeOnce?: (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>
+};
+
 type NormalHook = (to: Route, from?: Route) => void;
 type UpdateHook = (route: Route) => void;
 
@@ -231,12 +237,12 @@ export default class Router {
 
       this.updateRouteMeta(route);
 
-      return this.runHooks(
+      return this.runGuardHooks(
         (this.current?._beforeLeaveHooks || []).concat(this.beforeChangeHooks, beforeEnterHooks),
         route,
         () =>
           Promise.all(asyncComponentPromises).then(modules =>
-            this.runHooks(
+            this.runGuardHooks(
               modules.filter(m => m.beforeEnter).map(m => m.beforeEnter),
               route,
               () => {
@@ -316,7 +322,7 @@ export default class Router {
     return this.internalURLtoHref(this.locationToInternalURL(location));
   }
 
-  private runHooks(hooks: GuardHook[], to: Route, onFulfilled: () => HandlerResult | Promise<HandlerResult>) {
+  private runGuardHooks(hooks: GuardHook[], to: Route, onFulfilled: () => HandlerResult | Promise<HandlerResult>) {
     let promise: Promise<HandlerResult> = Promise.resolve(null);
 
     for (const hook of hooks) {
@@ -602,15 +608,28 @@ export default class Router {
     return this.go(1, state);
   }
 
-  on(event: 'beforeChange', handler: GuardHook): void;
+  on(event: 'beforeChange', handler: GuardHook, { once, beginning }?: { once?: boolean, beginning?: boolean}): void;
 
   on(event: 'update', handler: UpdateHook): void;
 
   on(event: 'afterChange', handler: NormalHook): void;
 
-  on(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
+  on(event: string, handler: GuardHook | UpdateHook | NormalHook, { once = false, beginning = false } = {}): void {
     if (event === 'beforeChange') {
-      this.beforeChangeHooks.push(handler as GuardHook);
+      let _handler = <GuardHook>handler;
+
+      if (once) {
+        _handler = _handler._beforeChangeOnce = (to: Route, from?: Route) => {
+          this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== _handler);
+          return handler(to, from);
+        };
+      }
+
+      if (beginning) {
+        this.beforeChangeHooks.unshift(_handler);
+      } else {
+        this.beforeChangeHooks.push(_handler);
+      }
     } else if (event === 'update') {
       this.updateHooks.push(handler as UpdateHook);
     } else if (event === 'afterChange') {
@@ -618,15 +637,23 @@ export default class Router {
     }
   }
 
-  off(event: 'beforeChange', handler: GuardHook): void;
+  off(event: 'beforeChange', handler: GuardHook, { once }?: { once?: boolean }): void;
 
   off(event: 'update', handler: UpdateHook): void;
 
   off(event: 'afterChange', handler: NormalHook): void;
 
-  off(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
+  off(event: string, handler: GuardHook | UpdateHook | NormalHook, { once = false } = {}): void {
     if (event === 'beforeChange') {
-      this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
+      this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => {
+        let _handler = <GuardHook>handler;
+
+        if (once) {
+          _handler = <GuardHook>_handler._beforeChangeOnce;
+        }
+
+        return fn !== _handler;
+      });
     } else if (event === 'update') {
       this.updateHooks = this.updateHooks.filter(fn => fn !== handler);
     } else if (event === 'afterChange') {
