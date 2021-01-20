@@ -7,73 +7,82 @@ type PrimitiveTypes = string | number | boolean | null | undefined;
 type SerializableData = string | number | boolean | null | undefined | SerializableData[] |
   { [name: string]: SerializableData };
 
-type SerializableObject = Record<string, SerializableData>;
+export type SerializableObject = Record<string, SerializableData>;
 
 type SyncComponent = SvelteComponent | {
   default: SvelteComponent,
   preload?: PreloadFn,
-  beforeEnter?: Hook
+  beforeEnter?: GuardHook
 };
 
 type AsyncComponent = () => Promise<SyncComponent>;
 type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
+type PropSetters = Array<(route: Route) => SerializableObject>;
 
-type PreloadData = {
+export type PreloadData = {
   data?: SerializableObject,
   children?: Record<string, PreloadData>
 };
 
-type PreloadFn = (props: SerializableObject, serverContext: any) => Promise<SerializableObject>;
-type PreloadFnWrapper = (route: Route, serverContext: any) => Promise<SerializableObject>;
+type PreloadFn = (props?: SerializableObject, serverContext?: unknown) => Promise<SerializableObject>;
+type PreloadFnWrapper = (serverContext?: unknown) => Promise<SerializableObject>;
+type KeyFn = (route: Route) => PrimitiveTypes;
 
 type RouterViewDef = {
   name?: string,
   path?: string,
   component?: SyncComponent | AsyncComponent,
   props?: RouteProps,
+  key?: KeyFn,
   meta?: RouteProps,
   children?: RouterViewDefGroup,
-  beforeEnter?: Hook,
-  beforeLeave?: Hook
+  beforeEnter?: GuardHook,
+  beforeLeave?: GuardHook
 };
 
 type RouterViewDefGroup = (RouterViewDef | RouterViewDef[])[];
 type RouterViewDefStacks = RouterViewDef[][];
 
-type RouterViewResolved = {
+export type RouterViewResolved = {
   name: string,
   component?: SyncComponent,
-  props?: RouteProps,
+  props?: SerializableObject,
+  key?: PrimitiveTypes,
   children?: Record<string, RouterViewResolved>
 };
 
+export type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
 
-type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
-
-type Location = {
+export type Location = {
   path: string,
   query?: Query,
   hash?: string,
   state?: SerializableObject
 };
 
-type Route = {
+export type Route = {
   path: string,
   query: StringCaster,
   hash: string,
   state: SerializableObject,
   params: StringCaster,
   meta: SerializableObject,
-  href: string
+  href: string,
+  _routerViews: Record<string, RouterViewResolved>
+  _beforeLeaveHooks: GuardHook[],
+  _metaSetters: RouteProps[],
+  _propSetters: PropSetters,
+  _keySetters: KeyFn[]
 };
 
-type Hook = (to: Route, from: Route) => undefined | boolean | string | Location;
+type GuardHook = (to: Route, from?: Route) => undefined | boolean | string | Location;
+type NormalHook = (to: Route, from?: Route) => void;
+type UpdateHook = (route: Route) => void;
 
 type Mode = 'server' | 'client';
 
 type HandlerResult = {
   route: Route,
-  routerViewRoot: RouterViewResolved,
   preloadData: PreloadData | null
 } | null;
 
@@ -95,17 +104,7 @@ function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
   }
 }
 
-function computeProps(route: Route, props?: RouteProps) {
-  if (!props) {
-    return {};
-  } else if (props instanceof Function) {
-    return props(route);
-  } else {
-    return props;
-  }
-}
-
-export class HookInterrupt extends Error {
+class HookInterrupt extends Error {
   location?: string | Location
 
   constructor(location?: string | Location) {
@@ -121,34 +120,23 @@ export default class Router {
 
   private urlRouter: UrlRouter<RouterViewDefStacks>
 
-  private beforeChangeHooks: Hook[] = []
+  private beforeChangeHooks: GuardHook[] = []
 
-  private beforeCurrentLeaveHooks: Hook[] = []
+  private afterChangeHooks: NormalHook[] = []
+
+  private updateHooks: UpdateHook[] = []
 
   private onPopStateWrapper: () => void
 
-  mode?: Mode
+  private mode?: Mode
 
-  preloadData?: SerializableObject
-
-  routerViewRoot?: RouterViewResolved
-
-  current: Route = {
-    path: '',
-    query: new StringCaster({}),
-    hash: '',
-    state: {},
-    params: new StringCaster({}),
-    meta: {},
-    href: ''
-  }
+  current?: Route
 
   constructor({
     routes,
     base,
     pathParam,
-    mode = detectedMode,
-    preloadData
+    mode = detectedMode
   }: {
     routes: RouterViewDefGroup,
     base?: string,
@@ -160,7 +148,6 @@ export default class Router {
     this.base = base;
     this.pathParam = pathParam;
     this.mode = mode;
-    this.preloadData = preloadData;
     this.onPopStateWrapper = () => this.onPopState();
 
     if (this.mode === 'client') {
@@ -170,7 +157,7 @@ export default class Router {
         history.replaceState({ __position__: history.length }, '');
       }
 
-      this.handle({
+      this.replace({
         path: location.href,
         state: history.state
       });
@@ -206,7 +193,7 @@ export default class Router {
     return result;
   }
 
-  handle(location: string | Location, serverContext?: any): Promise<HandlerResult> {
+  handle(location: string | Location, serverContext?: unknown): Promise<HandlerResult> {
     return Promise.resolve().then(() => {
       const url = this.locationToInternalURL(location);
       const matchedURLRoute = this.urlRouter.find(url.pathname);
@@ -216,8 +203,10 @@ export default class Router {
       }
 
       const {
-        routerViewRoot,
-        metaParams,
+        routerViews,
+        metaSetters,
+        propSetters,
+        keySetters,
         beforeEnterHooks,
         beforeLeaveHooks,
         asyncComponentPromises,
@@ -225,43 +214,49 @@ export default class Router {
         preloadData
       } = this.resolveRoute(matchedURLRoute.handler);
 
-      const to: Route = {
+      const route: Route = {
         path: url.pathname,
         query: new StringCaster(url.searchParams),
         hash: url.hash,
         state: typeof location === 'string' || !location.state ? {} : location.state,
         params: new StringCaster(matchedURLRoute.params),
         meta: {},
-        href: this.internalURLtoHref(url)
+        href: this.internalURLtoHref(url),
+        _routerViews: routerViews,
+        _beforeLeaveHooks: beforeLeaveHooks,
+        _metaSetters: metaSetters,
+        _propSetters: propSetters,
+        _keySetters: keySetters
       };
 
-      this.assignMeta(to, metaParams);
+      this.updateRouteMeta(route);
 
       return this.runHooks(
-        this.beforeCurrentLeaveHooks.concat(this.beforeChangeHooks, beforeEnterHooks),
-        to,
+        (this.current?._beforeLeaveHooks || []).concat(this.beforeChangeHooks, beforeEnterHooks),
+        route,
         () =>
           Promise.all(asyncComponentPromises).then(modules =>
             this.runHooks(
               modules.filter(m => m.beforeEnter).map(m => m.beforeEnter),
-              to,
+              route,
               () => {
+                this.updateRouteProps(route);
+                this.updateRouteKeys(route);
+                this.emit('update', route);
+                this.emit('afterChange', route, this.current);
+
                 if (this.mode === 'server') {
                   return Promise.all(
-                    preloadFns.map(preload => preload(to, serverContext))
+                    preloadFns.map(preload => preload(serverContext))
                   ).then(() => ({
-                    route: to,
-                    routerViewRoot,
+                    route,
                     preloadData
                   }));
                 } else {
-                  this.current = to;
-                  this.routerViewRoot = routerViewRoot;
-                  this.beforeCurrentLeaveHooks = beforeLeaveHooks;
+                  this.current = route;
 
                   return {
-                    route: to,
-                    routerViewRoot,
+                    route,
                     preloadData: null
                   };
                 }
@@ -317,11 +312,11 @@ export default class Router {
     }
   }
 
-  toHref(location: string | Location) {
+  toHref(location: string | Location): string {
     return this.internalURLtoHref(this.locationToInternalURL(location));
   }
 
-  private runHooks(hooks: Hook[], to: Route, onFulfilled: () => HandlerResult | Promise<HandlerResult>) {
+  private runHooks(hooks: GuardHook[], to: Route, onFulfilled: () => HandlerResult | Promise<HandlerResult>) {
     let promise: Promise<HandlerResult> = Promise.resolve(null);
 
     for (const hook of hooks) {
@@ -357,21 +352,25 @@ export default class Router {
   }
 
   private resolveRoute(stacks: RouterViewDef[][]) {
-    const rootWrapper: Record<string, RouterViewResolved> = {};
-    const metaParams: RouteProps[] = [];
-    const beforeEnterHooks: Hook[] = [];
-    const beforeLeaveHooks: Hook[] = [];
+    const routerViews: Record<string, RouterViewResolved> = {};
+    const metaSetters: RouteProps[] = [];
+    const propSetters: PropSetters = [];
+    const keySetters: KeyFn[] = [];
+    const beforeEnterHooks: GuardHook[] = [];
+    const beforeLeaveHooks: GuardHook[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
     const preloadFns: PreloadFnWrapper[] = [];
     const preloadData: PreloadData | null = this.mode === 'server' ? {} : null;
-    let children = rootWrapper;
+    let children = routerViews;
 
     for (const stack of stacks) {
       this.resolveRouterViews(
         stack,
         true,
         children,
-        metaParams,
+        metaSetters,
+        propSetters,
+        keySetters,
         beforeEnterHooks,
         beforeLeaveHooks,
         asyncComponentPromises,
@@ -384,8 +383,10 @@ export default class Router {
     }
 
     return {
-      routerViewRoot: rootWrapper.default,
-      metaParams,
+      routerViews,
+      metaSetters,
+      propSetters,
+      keySetters,
       beforeEnterHooks,
       beforeLeaveHooks,
       asyncComponentPromises,
@@ -398,16 +399,18 @@ export default class Router {
     stack: RouterViewDef[],
     skipLastViewChildren: boolean,
     routerViews: Record<string, RouterViewResolved>,
-    metaParams: RouteProps[],
-    beforeEnterHooks: Hook[],
-    beforeLeaveHooks: Hook[],
+    metaSetters: RouteProps[],
+    propSetters: PropSetters,
+    keySetters: KeyFn[],
+    beforeEnterHooks: GuardHook[],
+    beforeLeaveHooks: GuardHook[],
     asyncComponentPromises: Promise<SyncComponent>[],
     preloadFns: PreloadFnWrapper[],
     preloadData: PreloadData | null
   ): void {
     stack.forEach(routerViewDef => {
-      const { name = 'default', component, props, meta, beforeEnter, beforeLeave, children } = routerViewDef;
-      const routerView: RouterViewResolved = routerViews[name] = { name, props };
+      const { name = 'default', component, props, key, meta, beforeEnter, beforeLeave, children } = routerViewDef;
+      const routerView: RouterViewResolved = routerViews[name] = { name };
 
       if (beforeEnter) {
         beforeEnterHooks.push(beforeEnter);
@@ -418,7 +421,19 @@ export default class Router {
       }
 
       if (meta) {
-        metaParams.push(meta);
+        metaSetters.push(meta);
+      }
+
+      if (props) {
+        if (props instanceof Function) {
+          propSetters.push(route => routerView.props = props(route));
+        } else {
+          routerView.props = props;
+        }
+      }
+
+      if (key) {
+        keySetters.push(route => routerView.key = key(route));
       }
 
       if (component instanceof Function) {
@@ -447,7 +462,7 @@ export default class Router {
 
       function pushPreloadFn(preload: PreloadFn, preloadData: PreloadData) {
         preloadFns.push(
-          (route, ctx) => preload(computeProps(route, props), ctx).then(data => preloadData.data = data)
+          ctx => preload(routerView.props, ctx).then(data => preloadData.data = data)
         );
       }
 
@@ -458,7 +473,9 @@ export default class Router {
           children.filter((v): v is RouterViewDef => !(v instanceof Array) && !v.path),
           false,
           routerView.children,
-          metaParams,
+          metaSetters,
+          propSetters,
+          keySetters,
           beforeEnterHooks,
           beforeLeaveHooks,
           asyncComponentPromises,
@@ -469,11 +486,23 @@ export default class Router {
     });
   }
 
-  private assignMeta(route: Route, metaParams: RouteProps[]) {
-    const meta: SerializableObject = {};
-    route.meta = {};
-    metaParams.forEach(v => Object.assign(meta, v instanceof Function ? v(route) : v));
-    route.meta = meta;
+  private updateRoute(route: Route) {
+    this.updateRouteMeta(route);
+    this.updateRouteProps(route);
+    this.updateRouteKeys(route);
+  }
+
+  private updateRouteMeta(route: Route) {
+    const meta: SerializableObject = route.meta = {};
+    route._metaSetters.forEach(v => Object.assign(meta, v instanceof Function ? v(route) : v));
+  }
+
+  private updateRouteProps(route: Route) {
+    route._propSetters.forEach(fn => fn(route));
+  }
+
+  private updateRouteKeys(route: Route) {
+    route._keySetters.forEach(fn => fn(route));
   }
 
   setState(state: SerializableObject): void {
@@ -481,8 +510,14 @@ export default class Router {
       Object.assign(this.current.state, state);
 
       if (this.mode === 'client') {
-        history.replaceState(this.current.state, '');
+        history.replaceState({
+          ...this.current.state,
+          __position__: history.state.__position__
+        }, '');
       }
+
+      this.updateRoute(this.current);
+      this.emit('update', this.current);
     }
   }
 
@@ -507,7 +542,7 @@ export default class Router {
         history.replaceState(
           {
             ...result.route.state,
-            __position__: history.state.__position
+            __position__: history.state.__position__
           },
           '',
           result.route.href
@@ -522,11 +557,16 @@ export default class Router {
       state: { ...history.state, ...state }
     }).then(result => {
       if (result) {
-        if (state) {
-          history.replaceState(result.route.state, '');
-        }
+        history.replaceState(
+          {
+            ...result.route.state,
+            __position__: history.state.__position__
+          },
+          '',
+          result.route.href
+        );
       } else {
-        this.silentGo(<number> this.current.state.__position__ - history.state.__position__);
+        this.silentGo(<number> this.current?.state.__position__ - history.state.__position__);
       }
     });
   }
@@ -560,5 +600,45 @@ export default class Router {
 
   forward(state?: SerializableObject): void {
     return this.go(1, state);
+  }
+
+  on(event: 'beforeChange', handler: GuardHook): void;
+
+  on(event: 'update', handler: UpdateHook): void;
+
+  on(event: 'afterChange', handler: NormalHook): void;
+
+  on(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
+    if (event === 'beforeChange') {
+      this.beforeChangeHooks.push(handler as GuardHook);
+    } else if (event === 'update') {
+      this.updateHooks.push(handler as UpdateHook);
+    } else if (event === 'afterChange') {
+      this.afterChangeHooks.push(handler as NormalHook);
+    }
+  }
+
+  off(event: 'beforeChange', handler: GuardHook): void;
+
+  off(event: 'update', handler: UpdateHook): void;
+
+  off(event: 'afterChange', handler: NormalHook): void;
+
+  off(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
+    if (event === 'beforeChange') {
+      this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
+    } else if (event === 'update') {
+      this.updateHooks = this.updateHooks.filter(fn => fn !== handler);
+    } else if (event === 'afterChange') {
+      this.afterChangeHooks = this.afterChangeHooks.filter(fn => fn !== handler);
+    }
+  }
+
+  private emit(event: string, to: Route, from?: Route) {
+    if (event === 'update') {
+      this.updateHooks.forEach(fn => fn(to));
+    } else if (event === 'afterChange') {
+      this.afterChangeHooks.forEach(fn => fn(to, from));
+    }
   }
 }

@@ -1,8 +1,38 @@
-<svelte:component this={$view.component} {...$view.props}/>
-
 <script>
-import { getContext, setContext } from 'svelte'
-import key from './key'
-export let name
-const view = getContext(key)[name]
+  import { getContext, setContext, onDestroy } from 'svelte';
+  import { writable } from 'svelte/store';
+  import CTX_KEY from './CTX_KEY';
+
+  export let name = 'default';
+
+  let view, props;
+  const parentStore = getContext(CTX_KEY);
+  const childrenStore = writable();
+  setContext(CTX_KEY, childrenStore);
+
+  const unsubscribe = parentStore.subscribe(({ routerViews, preloadData }) => {
+    view = routerViews?.[name];
+
+    if (preloadData) {
+      props = {
+        ...view?.props,
+        ...preloadData?.[name]
+      };
+    } else {
+      props = view?.props;
+    }
+
+    childrenStore.set({
+      routerViews: view?.children,
+      preloadData: preloadData?.children
+    });
+  });
+
+  onDestroy(unsubscribe);
 </script>
+
+{#if view}
+  {#key view.key}
+    <svelte:component this={view.component} {...props} />
+  {/key}
+{/if}
