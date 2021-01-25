@@ -24,6 +24,8 @@
   ],
 
   "rules": {
-    "no-multiple-empty-lines": ["error", { "max": 1, "maxBOF": 2, "maxEOF": 1 }]
+    "no-multiple-empty-lines": ["error", { "max": 1, "maxBOF": 2, "maxEOF": 1 }],
+    "no-extra-parens": "off",
+    "@typescript-eslint/no-extra-parens": "error"
   }
 }

@@ -7,19 +7,21 @@ type PrimitiveTypes = string | number | boolean | null | undefined;
 type SerializableData = string | number | boolean | null | undefined | SerializableData[] |
   { [name: string]: SerializableData };
 
-export type SerializableObject = Record<string, SerializableData>;
+type SerializableObject = Record<string, SerializableData>;
 
-type SyncComponent = SvelteComponent | {
-  default: SvelteComponent,
+type ComponentModule = {
+  default: typeof SvelteComponent,
   preload?: PreloadFn,
   beforeEnter?: GuardHook
 };
+
+type SyncComponent = ComponentModule | typeof SvelteComponent;
 
 type AsyncComponent = () => Promise<SyncComponent>;
 type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
 type PropSetters = Array<(route: Route) => SerializableObject>;
 
-export type PreloadData = {
+type PreloadData = {
   data?: SerializableObject,
   children?: Record<string, PreloadData>
 };
@@ -43,7 +45,7 @@ type RouterViewDef = {
 type RouterViewDefGroup = (RouterViewDef | RouterViewDef[])[];
 type RouterViewDefStacks = RouterViewDef[][];
 
-export type RouterViewResolved = {
+type RouterViewResolved = {
   name: string,
   component?: SyncComponent,
   props?: SerializableObject,
@@ -51,16 +53,16 @@ export type RouterViewResolved = {
   children?: Record<string, RouterViewResolved>
 };
 
-export type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
+type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
 
-export type Location = {
+type Location = {
   path: string,
   query?: Query,
   hash?: string,
   state?: SerializableObject
 };
 
-export type Route = {
+type Route = {
   path: string,
   query: StringCaster,
   hash: string,
@@ -147,8 +149,7 @@ export default class Router {
     routes: RouterViewDefGroup,
     base?: string,
     pathParam?: string,
-    mode: Mode,
-    preloadData?: SerializableObject
+    mode?: Mode
   }) {
     this.urlRouter = new UrlRouter(this.flatRoutes(routes));
     this.base = base;
@@ -243,7 +244,7 @@ export default class Router {
         () =>
           Promise.all(asyncComponentPromises).then(modules =>
             this.runGuardHooks(
-              modules.filter(m => m.beforeEnter).map(m => m.beforeEnter),
+              modules.filter((m): m is ComponentModule => 'beforeEnter' in m).map(m => <GuardHook>m.beforeEnter),
               route,
               () => {
                 this.updateRouteProps(route);
@@ -443,13 +444,13 @@ export default class Router {
       }
 
       if (component instanceof Function) {
-        const promise = component();
+        const promise = (<AsyncComponent>component)();
 
         promise.then(component => {
           routerViewDef.component = routerView.component = component;
 
-          if (component.preload && preloadData) {
-            pushPreloadFn(component.preload, preloadData);
+          if ((<ComponentModule>component).preload && preloadData) {
+            pushPreloadFn(<PreloadFn>(<ComponentModule>component).preload, preloadData);
           }
         });
 
@@ -616,24 +617,22 @@ export default class Router {
 
   on(event: string, handler: GuardHook | UpdateHook | NormalHook, { once = false, beginning = false } = {}): void {
     if (event === 'beforeChange') {
-      let _handler = <GuardHook>handler;
-
       if (once) {
-        _handler = _handler._beforeChangeOnce = (to: Route, from?: Route) => {
-          this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== _handler);
+        handler = (<GuardHook>handler)._beforeChangeOnce = (to: Route, from?: Route) => {
+          this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
           return handler(to, from);
         };
       }
 
       if (beginning) {
-        this.beforeChangeHooks.unshift(_handler);
+        this.beforeChangeHooks.unshift(handler);
       } else {
-        this.beforeChangeHooks.push(_handler);
+        this.beforeChangeHooks.push(handler);
       }
     } else if (event === 'update') {
-      this.updateHooks.push(handler as UpdateHook);
+      this.updateHooks.push(<UpdateHook>handler);
     } else if (event === 'afterChange') {
-      this.afterChangeHooks.push(handler as NormalHook);
+      this.afterChangeHooks.push(<NormalHook>handler);
     }
   }
 
@@ -645,15 +644,11 @@ export default class Router {
 
   off(event: string, handler: GuardHook | UpdateHook | NormalHook, { once = false } = {}): void {
     if (event === 'beforeChange') {
-      this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => {
-        let _handler = <GuardHook>handler;
+      if (once) {
+        handler = <GuardHook>(<GuardHook>handler)._beforeChangeOnce;
+      }
 
-        if (once) {
-          _handler = <GuardHook>_handler._beforeChangeOnce;
-        }
-
-        return fn !== _handler;
-      });
+      this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
     } else if (event === 'update') {
       this.updateHooks = this.updateHooks.filter(fn => fn !== handler);
     } else if (event === 'afterChange') {

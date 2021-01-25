@@ -2,16 +2,12 @@
   "name": "svelte-pilot",
   "version": "0.0.0",
   "description": "A svelte router with the power of history.state",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",
-  "exports": {
-    "import": "./dist/index.js",
-    "require": "./dist/index.cjs"
-  },
   "scripts": {
-    "build": "rollup -c rollup.config.esm.js && rollup -c rollup.config.cjs.js"
+    "build": "tsc && cp src/*.svelte dist"
   },
   "repository": {
     "type": "git",
