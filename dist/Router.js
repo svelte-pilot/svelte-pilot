@@ -45,7 +45,7 @@ export default class Router {
             });
         }
     }
-    flatRoutes(routerViews, sideViews = [], stacks = [], result = []) {
+    flatRoutes(routerViews, sideViews = [], stacks = [], result = {}) {
         const sideViewsInArray = routerViews.filter((v) => !Array.isArray(v) && !v.path);
         const sideViewNames = sideViewsInArray.map(v => v.name);
         // Router views in the same array have higher priority than outer ones.
@@ -57,7 +57,7 @@ export default class Router {
             else if (routerView.path || routerView.children) {
                 stacks = [...stacks, sideViews.filter(v => v.name !== routerView.name).concat(routerView)];
                 if (routerView.path) {
-                    result.push([routerView.path, stacks]);
+                    result[routerView.path] = stacks;
                 }
                 else if (routerView.children) {
                     this.flatRoutes(routerView.children, sideViews, stacks, result);
