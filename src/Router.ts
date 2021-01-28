@@ -175,7 +175,7 @@ export default class Router {
     routerViews: RouterViewDefGroup,
     sideViews: RouterViewDef[] = [],
     stacks: RouterViewDef[][] = [],
-    result: [string, RouterViewDef[][]][] = []
+    result: Record<string, RouterViewDef[][]> = {}
   ) {
     const sideViewsInArray = routerViews.filter((v): v is RouterViewDef => !Array.isArray(v) && !v.path);
     const sideViewNames = sideViewsInArray.map(v => v.name);
@@ -190,7 +190,7 @@ export default class Router {
         stacks = [...stacks, sideViews.filter(v => v.name !== routerView.name).concat(routerView)];
 
         if (routerView.path) {
-          result.push([routerView.path, stacks]);
+          result[routerView.path] = stacks;
         } else if (routerView.children) {
           this.flatRoutes(routerView.children, sideViews, stacks, result);
         }
