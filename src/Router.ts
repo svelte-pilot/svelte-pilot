@@ -57,6 +57,7 @@ type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams
 
 type Location = {
   path: string,
+  params?: Record<string, string | number | boolean>,
   query?: Query,
   hash?: string,
   state?: SerializableObject
@@ -65,6 +66,7 @@ type Location = {
 type Route = {
   path: string,
   query: StringCaster,
+  search: string,
   hash: string,
   state: SerializableObject,
   params: StringCaster,
@@ -202,8 +204,8 @@ export default class Router {
 
   handle(location: string | Location, serverContext?: unknown): Promise<HandlerResult> {
     return Promise.resolve().then(() => {
-      const url = this.locationToInternalURL(location);
-      const matchedURLRoute = this.urlRouter.find(url.pathname);
+      const loc = this.parseLocation(location);
+      const matchedURLRoute = this.urlRouter.find(loc.path);
 
       if (!matchedURLRoute) {
         return null;
@@ -222,13 +224,9 @@ export default class Router {
       } = this.resolveRoute(matchedURLRoute.handler);
 
       const route: Route = {
-        path: url.pathname,
-        query: new StringCaster(url.searchParams),
-        hash: url.hash,
-        state: typeof location === 'string' || !location.state ? {} : location.state,
+        ...loc,
         params: new StringCaster(matchedURLRoute.params),
         meta: {},
-        href: this.internalURLtoHref(url),
         _routerViews: routerViews,
         _beforeLeaveHooks: beforeLeaveHooks,
         _metaSetters: metaSetters,
@@ -279,7 +277,10 @@ export default class Router {
       location = { path: location };
     }
 
-    const url = new URL(location.path, 'file:');
+    const url = new URL(
+      location.path.replace(/:([a-z]\w*)/ig, (_, w) => encodeURIComponent(<string>(<Location>location).params?.[w])),
+      'file:'
+    );
 
     if (location.query) {
       appendSearchParams(url.searchParams, location.query);
@@ -296,9 +297,11 @@ export default class Router {
         url.pathname = url.pathname.slice(this.base.length);
       } else if (this.pathParam) {
         url.pathname = url.searchParams.get(this.pathParam) || '/';
+        url.searchParams.delete(this.pathParam);
       }
     }
 
+    url.searchParams.sort?.();
     return url;
   }
 
@@ -319,7 +322,20 @@ export default class Router {
     }
   }
 
-  toHref(location: string | Location): string {
+  parseLocation(location: string | Location) {
+    const url = this.locationToInternalURL(location);
+
+    return {
+      path: url.pathname,
+      query: new StringCaster(url.searchParams),
+      search: url.search,
+      hash: url.hash,
+      state: typeof location === 'string' || !location.state ? {} : location.state,
+      href: this.internalURLtoHref(url)
+    };
+  }
+
+  href(location: string | Location): string {
     return this.internalURLtoHref(this.locationToInternalURL(location));
   }
 

@@ -42,6 +42,7 @@ declare type RouterViewResolved = {
 declare type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
 declare type Location = {
     path: string;
+    params?: Record<string, string | number | boolean>;
     query?: Query;
     hash?: string;
     state?: SerializableObject;
@@ -49,6 +50,7 @@ declare type Location = {
 declare type Route = {
     path: string;
     query: StringCaster;
+    search: string;
     hash: string;
     state: SerializableObject;
     params: StringCaster;
@@ -92,7 +94,15 @@ export default class Router {
     handle(location: string | Location, serverContext?: unknown): Promise<HandlerResult>;
     private locationToInternalURL;
     private internalURLtoHref;
-    toHref(location: string | Location): string;
+    parseLocation(location: string | Location): {
+        path: string;
+        query: StringCaster;
+        search: string;
+        hash: string;
+        state: Record<string, SerializableData>;
+        href: string;
+    };
+    href(location: string | Location): string;
     private runGuardHooks;
     private resolveRoute;
     private resolveRouterViews;

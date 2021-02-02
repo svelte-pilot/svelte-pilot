@@ -1,14 +1,14 @@
 <script>
   import { getContext, setContext, onDestroy } from 'svelte';
   import { writable } from 'svelte/store';
-  import CTX_KEY from './CTX_KEY';
+  import { CTX_CHILDREN } from './ctxKeys';
 
   export let name = 'default';
 
   let view, props;
-  const parentStore = getContext(CTX_KEY);
+  const parentStore = getContext(CTX_CHILDREN);
   const childrenStore = writable();
-  setContext(CTX_KEY, childrenStore);
+  setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe });
 
   const unsubscribe = parentStore.subscribe(({ routerViews, preloadData } = {}) => {
     view = routerViews?.[name];

@@ -68,20 +68,16 @@ export default class Router {
     }
     handle(location, serverContext) {
         return Promise.resolve().then(() => {
-            const url = this.locationToInternalURL(location);
-            const matchedURLRoute = this.urlRouter.find(url.pathname);
+            const loc = this.parseLocation(location);
+            const matchedURLRoute = this.urlRouter.find(loc.path);
             if (!matchedURLRoute) {
                 return null;
             }
             const { routerViews, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, preloadData } = this.resolveRoute(matchedURLRoute.handler);
             const route = {
-                path: url.pathname,
-                query: new StringCaster(url.searchParams),
-                hash: url.hash,
-                state: typeof location === 'string' || !location.state ? {} : location.state,
+                ...loc,
                 params: new StringCaster(matchedURLRoute.params),
                 meta: {},
-                href: this.internalURLtoHref(url),
                 _routerViews: routerViews,
                 _beforeLeaveHooks: beforeLeaveHooks,
                 _metaSetters: metaSetters,
@@ -114,7 +110,7 @@ export default class Router {
         if (typeof location === 'string') {
             location = { path: location };
         }
-        const url = new URL(location.path, 'file:');
+        const url = new URL(location.path.replace(/:([a-z]\w*)/ig, (_, w) => encodeURIComponent(location.params?.[w])), 'file:');
         if (location.query) {
             appendSearchParams(url.searchParams, location.query);
         }
@@ -129,8 +125,10 @@ export default class Router {
             }
             else if (this.pathParam) {
                 url.pathname = url.searchParams.get(this.pathParam) || '/';
+                url.searchParams.delete(this.pathParam);
             }
         }
+        url.searchParams.sort?.();
         return url;
     }
     // If `base` is not ends with '/', and path is root ('/'), the ending slash will be trimmed.
@@ -148,7 +146,18 @@ export default class Router {
                 : url.pathname) + url.search + url.hash;
         }
     }
-    toHref(location) {
+    parseLocation(location) {
+        const url = this.locationToInternalURL(location);
+        return {
+            path: url.pathname,
+            query: new StringCaster(url.searchParams),
+            search: url.search,
+            hash: url.hash,
+            state: typeof location === 'string' || !location.state ? {} : location.state,
+            href: this.internalURLtoHref(url)
+        };
+    }
+    href(location) {
         return this.internalURLtoHref(this.locationToInternalURL(location));
     }
     runGuardHooks(hooks, to, onFulfilled) {

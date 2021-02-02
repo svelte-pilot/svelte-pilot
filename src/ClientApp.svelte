@@ -2,13 +2,16 @@
   import { setContext } from 'svelte';
   import { writable } from 'svelte/store';
   import RouterView from './RouterView.svelte';
-  import CTX_KEY from './CTX_KEY';
+  import { CTX_CHILDREN, CTX_ROUTER, CTX_ROUTE } from './ctxKeys';
 
   export let router;
   export let preloadData = null;
 
-  const store = writable();
-  setContext(CTX_KEY, store);
+  const childrenStore = writable();
+  const routeStore = writable();
+  setContext(CTX_ROUTER, router);
+  setContext(CTX_ROUTE, { subscribe: routeStore.subscribe });
+  setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe });
   router.on('update', update);
 
   if (router.current) {
@@ -18,10 +21,12 @@
   let updateCount = 0;
 
   function update(route) {
-    store.set({
+    childrenStore.set({
       routerViews: route._routerViews,
       preloadData
     });
+
+    routeStore.set(route);
 
     updateCount++;
 
