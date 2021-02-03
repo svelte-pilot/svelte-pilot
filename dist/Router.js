@@ -91,7 +91,7 @@ export default class Router {
                 this.emit('update', route);
                 this.emit('afterChange', route, this.current);
                 if (this.mode === 'server') {
-                    return Promise.all(preloadFns.map(preload => preload(serverContext))).then(() => ({
+                    return Promise.all(preloadFns.map(preload => preload(route, serverContext))).then(() => ({
                         route,
                         preloadData
                     }));
@@ -262,7 +262,7 @@ export default class Router {
                 }
             }
             function pushPreloadFn(preload, preloadData) {
-                preloadFns.push(ctx => preload(routerView.props, ctx).then(data => preloadData.data = data));
+                preloadFns.push((route, ctx) => preload(routerView.props || {}, route, ctx).then(data => preloadData.data = data));
             }
             if (children && (!skipLastViewChildren || routerViewDef !== stack[stack.length - 1])) {
                 routerView.children = {};

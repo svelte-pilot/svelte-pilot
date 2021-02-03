@@ -26,8 +26,8 @@ type PreloadData = {
   children?: Record<string, PreloadData>
 };
 
-type PreloadFn = (props?: SerializableObject, serverContext?: unknown) => Promise<SerializableObject>;
-type PreloadFnWrapper = (serverContext?: unknown) => Promise<SerializableObject>;
+type PreloadFn = (props: SerializableObject, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
+type PreloadFnWrapper = (route: Route, serverContext?: unknown) => Promise<SerializableObject>;
 type KeyFn = (route: Route) => PrimitiveTypes;
 
 type RouterViewDef = {
@@ -252,7 +252,7 @@ export default class Router {
 
                 if (this.mode === 'server') {
                   return Promise.all(
-                    preloadFns.map(preload => preload(serverContext))
+                    preloadFns.map(preload => preload(route, serverContext))
                   ).then(() => ({
                     route,
                     preloadData
@@ -485,7 +485,7 @@ export default class Router {
 
       function pushPreloadFn(preload: PreloadFn, preloadData: PreloadData) {
         preloadFns.push(
-          ctx => preload(routerView.props, ctx).then(data => preloadData.data = data)
+          (route, ctx) => preload(routerView.props || {}, route, ctx).then(data => preloadData.data = data)
         );
       }
 

@@ -7,21 +7,22 @@ const router = new Router();
 
 async function handleRequest(url, serverContext) {
   const { route, preloadData } = await router.handle(url, serverContext);
+  const res = route.meta.response;
 
-  if ([].includes(route.meta.status)) {
+  if (res?.headers?.location) {
+    if (!res.status) {
+      res.status = 301;
+    }
 
-  }
-  const { head, css, html } = ServerApp.render({
-    route,
-    preloadData
-  });
+    return res;
+  } else {
+    res.body = ServerApp.render({ router, route, preloadData });
 
-  return {
-    header: {
+    if (!res.status) {
+      res.status = 200;
+    }
 
-    },
-
-    body: formatHTML({ head, css, html, preloadData })
+    return res;
   }
 }
 

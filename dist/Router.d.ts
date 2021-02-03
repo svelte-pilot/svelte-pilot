@@ -18,7 +18,7 @@ declare type PreloadData = {
     data?: SerializableObject;
     children?: Record<string, PreloadData>;
 };
-declare type PreloadFn = (props?: SerializableObject, serverContext?: unknown) => Promise<SerializableObject>;
+declare type PreloadFn = (props: SerializableObject, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
 declare type KeyFn = (route: Route) => PrimitiveTypes;
 declare type RouterViewDef = {
     name?: string;
