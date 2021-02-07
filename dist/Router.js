@@ -242,23 +242,23 @@ export default class Router {
             if (key) {
                 keySetters.push(route => routerView.key = key(route));
             }
-            if (component instanceof Function) {
+            if (component instanceof Function && !component.prototype) {
                 const promise = component();
                 promise.then(component => {
                     routerViewDef.component = routerView.component = component;
-                    if (component.preload && preloadData) {
-                        pushPreloadFn(component.preload, preloadData);
+                    if (routerView.component.preload && preloadData) {
+                        pushPreloadFn(routerView.component.preload, preloadData);
                     }
                 });
                 asyncComponentPromises.push(promise);
             }
             else {
                 routerView.component = component;
-                if (component?.beforeEnter) {
-                    beforeEnterHooks.push(component.beforeEnter);
+                if (routerView.component?.beforeEnter) {
+                    beforeEnterHooks.push(routerView.component.beforeEnter);
                 }
-                if (component?.preload && preloadData) {
-                    pushPreloadFn(component.preload, preloadData);
+                if (routerView.component?.preload && preloadData) {
+                    pushPreloadFn(routerView.component.preload, preloadData);
                 }
             }
             function pushPreloadFn(preload, preloadData) {
