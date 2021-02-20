@@ -330,7 +330,7 @@ export default class Router {
                 }, '', result.route.href);
             }
             else {
-                this.silentGo(this.current?.state.__position__ - history.state.__position__);
+                this.silentGo(this.current.state.__position__ - history.state.__position__);
             }
         });
     }

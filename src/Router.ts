@@ -26,7 +26,7 @@ type PreloadData = {
   children?: Record<string, PreloadData>
 };
 
-type PreloadFn = (props: SerializableObject, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
+type PreloadFn = (props: Record<string, any>, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
 type PreloadFnWrapper = (route: Route, serverContext?: unknown) => Promise<SerializableObject>;
 type KeyFn = (route: Route) => PrimitiveTypes;
 
@@ -70,7 +70,7 @@ type Route = {
   hash: string,
   state: SerializableObject,
   params: StringCaster,
-  meta: SerializableObject,
+  meta: Record<string, any>,
   href: string,
   _routerViews: Record<string, RouterViewResolved>
   _beforeLeaveHooks: GuardHook[],
@@ -589,7 +589,7 @@ export default class Router {
           result.route.href
         );
       } else {
-        this.silentGo(<number> this.current?.state.__position__ - history.state.__position__);
+        this.silentGo(<number>(<Route>this.current).state.__position__ - history.state.__position__);
       }
     });
   }

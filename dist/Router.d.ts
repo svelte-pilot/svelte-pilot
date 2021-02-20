@@ -18,7 +18,7 @@ declare type PreloadData = {
     data?: SerializableObject;
     children?: Record<string, PreloadData>;
 };
-declare type PreloadFn = (props: SerializableObject, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
+declare type PreloadFn = (props: Record<string, any>, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
 declare type KeyFn = (route: Route) => PrimitiveTypes;
 declare type RouterViewDef = {
     name?: string;
@@ -54,7 +54,7 @@ declare type Route = {
     hash: string;
     state: SerializableObject;
     params: StringCaster;
-    meta: SerializableObject;
+    meta: Record<string, any>;
     href: string;
     _routerViews: Record<string, RouterViewResolved>;
     _beforeLeaveHooks: GuardHook[];
