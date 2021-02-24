@@ -2,7 +2,10 @@ type ServerSideComponent = {
   render: (props?: {}) => {
     html: string,
     head: string,
-    css: string
+    css: {
+      code: string,
+      map: any
+    }
   }
 };
 
