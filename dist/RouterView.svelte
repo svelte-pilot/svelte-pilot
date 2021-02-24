@@ -19,7 +19,7 @@
         ...preloadData?.[name]
       };
     } else {
-      props = view?.props;
+      props = view?.props || {};
     }
 
     childrenStore.set({

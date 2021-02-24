@@ -1,3 +1,3 @@
-export const CTX_ROUTER = {};
-export const CTX_ROUTE = {};
-export const CTX_CHILDREN = {};
+export const CTX_ROUTER = '__SVELTE_PILOT_CTX_ROUTER__';
+export const CTX_ROUTE = '__SVELTE_PILOT_CTX_ROUTE__';
+export const CTX_CHILDREN = '__SVELTE_PILOT_CTX_CHILDREN__';
