@@ -1,6 +1,6 @@
 {
   "name": "svelte-pilot",
-  "version": "0.1.0-3",
+  "version": "0.1.0-4",
   "description": "A svelte router with the power of history.state",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
