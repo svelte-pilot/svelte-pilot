@@ -1,10 +1,11 @@
 import { SvelteComponent } from 'svelte';
 import { StringCaster } from 'cast-string';
-declare type PrimitiveTypes = string | number | boolean | null | undefined;
-declare type SerializableData = string | number | boolean | null | undefined | SerializableData[] | {
-    [name: string]: SerializableData;
+declare type PrimitiveType = string | number | boolean | null | undefined;
+declare type SerializableObject = {
+    [name: string]: PrimitiveType | PrimitiveType[] | {
+        [name: string]: SerializableObject;
+    };
 };
-declare type SerializableObject = Record<string, SerializableData>;
 declare type ComponentModule = {
     default: typeof SvelteComponent;
     preload?: PreloadFn;
@@ -18,8 +19,8 @@ declare type PreloadData = {
     data?: SerializableObject;
     children?: Record<string, PreloadData>;
 };
-declare type PreloadFn = (props: Record<string, any>, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
-declare type KeyFn = (route: Route) => PrimitiveTypes;
+declare type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+declare type KeyFn = (route: Route) => PrimitiveType;
 declare type RouterViewDef = {
     name?: string;
     path?: string;
@@ -31,15 +32,15 @@ declare type RouterViewDef = {
     beforeEnter?: GuardHook;
     beforeLeave?: GuardHook;
 };
-declare type RouterViewDefGroup = (RouterViewDef | RouterViewDef[])[];
+declare type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
 declare type RouterViewResolved = {
     name: string;
     component?: SyncComponent;
     props?: SerializableObject;
-    key?: PrimitiveTypes;
+    key?: PrimitiveType;
     children?: Record<string, RouterViewResolved>;
 };
-declare type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
+declare type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
 declare type Location = {
     path: string;
     params?: Record<string, string | number | boolean>;
@@ -63,10 +64,7 @@ declare type Route = {
     _keySetters: KeyFn[];
 };
 declare type GuardHookResult = void | boolean | string | Location;
-declare type GuardHook = {
-    (to: Route, from?: Route): GuardHookResult | Promise<GuardHookResult>;
-    _beforeChangeOnce?: (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
-};
+declare type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
 declare type NormalHook = (to: Route, from?: Route) => void;
 declare type UpdateHook = (route: Route) => void;
 declare type Mode = 'server' | 'client';
@@ -76,7 +74,7 @@ declare type HandlerResult = {
 } | null;
 export default class Router {
     private base?;
-    private pathParam?;
+    private pathQuery?;
     private urlRouter;
     private beforeChangeHooks;
     private afterChangeHooks;
@@ -84,14 +82,14 @@ export default class Router {
     private onPopStateWrapper;
     private mode?;
     current?: Route;
-    constructor({ routes, base, pathParam, mode }: {
+    constructor({ routes, base, pathQuery, mode }: {
         routes: RouterViewDefGroup;
         base?: string;
-        pathParam?: string;
+        pathQuery?: string;
         mode?: Mode;
     });
     private flatRoutes;
-    handle(location: string | Location, serverContext?: unknown): Promise<HandlerResult>;
+    handle(location: string | Location, ssrContext?: unknown): Promise<HandlerResult>;
     private locationToInternalURL;
     private internalURLtoHref;
     parseLocation(location: string | Location): {
@@ -99,7 +97,7 @@ export default class Router {
         query: StringCaster;
         search: string;
         hash: string;
-        state: Record<string, SerializableData>;
+        state: SerializableObject;
         href: string;
     };
     href(location: string | Location): string;
@@ -118,15 +116,10 @@ export default class Router {
     go(delta: number, state?: SerializableObject): void;
     back(state?: SerializableObject): void;
     forward(state?: SerializableObject): void;
-    on(event: 'beforeChange', handler: GuardHook, { once, beginning }?: {
-        once?: boolean;
-        beginning?: boolean;
-    }): void;
+    on(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
     on(event: 'update', handler: UpdateHook): void;
     on(event: 'afterChange', handler: NormalHook): void;
-    off(event: 'beforeChange', handler: GuardHook, { once }?: {
-        once?: boolean;
-    }): void;
+    off(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
     off(event: 'update', handler: UpdateHook): void;
     off(event: 'afterChange', handler: NormalHook): void;
     private emit;

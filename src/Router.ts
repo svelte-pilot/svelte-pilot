@@ -2,12 +2,8 @@ import { SvelteComponent } from 'svelte';
 import UrlRouter from 'url-router';
 import { StringCaster } from 'cast-string';
 
-type PrimitiveTypes = string | number | boolean | null | undefined;
-
-type SerializableData = string | number | boolean | null | undefined | SerializableData[] |
-  { [name: string]: SerializableData };
-
-type SerializableObject = Record<string, SerializableData>;
+type PrimitiveType = string | number | boolean | null | undefined;
+type SerializableObject = { [name: string]: PrimitiveType | PrimitiveType[] | { [name: string]: SerializableObject } };
 
 type ComponentModule = {
   default: typeof SvelteComponent,
@@ -16,7 +12,6 @@ type ComponentModule = {
 };
 
 type SyncComponent = ComponentModule | typeof SvelteComponent;
-
 type AsyncComponent = () => Promise<SyncComponent>;
 type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
 type PropSetters = Array<(route: Route) => SerializableObject>;
@@ -26,9 +21,9 @@ type PreloadData = {
   children?: Record<string, PreloadData>
 };
 
-type PreloadFn = (props: Record<string, any>, route: Route, serverContext?: unknown) => Promise<SerializableObject>;
-type PreloadFnWrapper = (route: Route, serverContext?: unknown) => Promise<SerializableObject>;
-type KeyFn = (route: Route) => PrimitiveTypes;
+type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+type PreloadFnWrapper = (route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+type KeyFn = (route: Route) => PrimitiveType;
 
 type RouterViewDef = {
   name?: string,
@@ -42,18 +37,18 @@ type RouterViewDef = {
   beforeLeave?: GuardHook
 };
 
-type RouterViewDefGroup = (RouterViewDef | RouterViewDef[])[];
+type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
 type RouterViewDefStacks = RouterViewDef[][];
 
 type RouterViewResolved = {
   name: string,
   component?: SyncComponent,
   props?: SerializableObject,
-  key?: PrimitiveTypes,
+  key?: PrimitiveType,
   children?: Record<string, RouterViewResolved>
 };
 
-type Query = Record<string, PrimitiveTypes | PrimitiveTypes[]> | URLSearchParams;
+type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
 
 type Location = {
   path: string,
@@ -81,11 +76,7 @@ type Route = {
 
 type GuardHookResult = void | boolean | string | Location;
 
-type GuardHook = {
-  (to: Route, from?: Route): GuardHookResult | Promise<GuardHookResult>,
-  _beforeChangeOnce?: (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>
-};
-
+type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
 type NormalHook = (to: Route, from?: Route) => void;
 type UpdateHook = (route: Route) => void;
 
@@ -126,7 +117,7 @@ class HookInterrupt extends Error {
 export default class Router {
   private base?: string
 
-  private pathParam?: string
+  private pathQuery?: string
 
   private urlRouter: UrlRouter<RouterViewDefStacks>
 
@@ -145,17 +136,17 @@ export default class Router {
   constructor({
     routes,
     base,
-    pathParam,
+    pathQuery,
     mode = detectedMode
   }: {
     routes: RouterViewDefGroup,
     base?: string,
-    pathParam?: string,
+    pathQuery?: string,
     mode?: Mode
   }) {
     this.urlRouter = new UrlRouter(this.flatRoutes(routes));
     this.base = base;
-    this.pathParam = pathParam;
+    this.pathQuery = pathQuery;
     this.mode = mode;
     this.onPopStateWrapper = () => this.onPopState();
 
@@ -202,7 +193,7 @@ export default class Router {
     return result;
   }
 
-  handle(location: string | Location, serverContext?: unknown): Promise<HandlerResult> {
+  handle(location: string | Location, ssrContext?: unknown): Promise<HandlerResult> {
     return Promise.resolve().then(() => {
       const loc = this.parseLocation(location);
       const matchedURLRoute = this.urlRouter.find(loc.path);
@@ -252,7 +243,7 @@ export default class Router {
 
                 if (this.mode === 'server') {
                   return Promise.all(
-                    preloadFns.map(preload => preload(route, serverContext))
+                    preloadFns.map(preload => preload(route, ssrContext))
                   ).then(() => ({
                     route,
                     preloadData
@@ -290,14 +281,14 @@ export default class Router {
       url.hash = location.hash;
     }
 
-    // `base` and `pathParam` only has effect on absolute URL.
-    // `base` and `pathParam` are mutually exclusive.
+    // `base` and `pathQuery` only has effect on absolute URL.
+    // `base` and `pathQuery` are mutually exclusive.
     if (/^\w+:/.test(location.path)) {
       if (this.base && url.pathname.startsWith(this.base)) {
         url.pathname = url.pathname.slice(this.base.length);
-      } else if (this.pathParam) {
-        url.pathname = url.searchParams.get(this.pathParam) || '/';
-        url.searchParams.delete(this.pathParam);
+      } else if (this.pathQuery) {
+        url.pathname = url.searchParams.get(this.pathQuery) || '/';
+        url.searchParams.delete(this.pathQuery);
       }
     }
 
@@ -307,8 +298,14 @@ export default class Router {
 
   // If `base` is not ends with '/', and path is root ('/'), the ending slash will be trimmed.
   private internalURLtoHref(url: URL) {
-    if (this.pathParam) {
-      return url.search + url.hash;
+    if (this.pathQuery) {
+      const u = new URL(url.href);
+
+      if (url.pathname !== '/') {
+        u.searchParams.set(this.pathQuery, url.pathname);
+      }
+
+      return u.search + u.hash;
     } else {
       return (
         this.base
@@ -625,46 +622,35 @@ export default class Router {
     return this.go(1, state);
   }
 
-  on(event: 'beforeChange', handler: GuardHook, { once, beginning }?: { once?: boolean, beginning?: boolean}): void;
+  on(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
 
   on(event: 'update', handler: UpdateHook): void;
 
   on(event: 'afterChange', handler: NormalHook): void;
 
-  on(event: string, handler: GuardHook | UpdateHook | NormalHook, { once = false, beginning = false } = {}): void {
+  on(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
     if (event === 'beforeChange') {
-      if (once) {
-        handler = (<GuardHook>handler)._beforeChangeOnce = (to: Route, from?: Route) => {
-          this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
-          return handler(to, from);
-        };
-      }
-
-      if (beginning) {
-        this.beforeChangeHooks.unshift(handler);
-      } else {
-        this.beforeChangeHooks.push(handler);
-      }
+      this.beforeChangeHooks.push(handler);
+    } else if (event === 'beforeCurrentRouteLeave') {
+      this.current?._beforeLeaveHooks.push(handler);
     } else if (event === 'update') {
-      this.updateHooks.push(<UpdateHook>handler);
+      this.updateHooks.push(handler);
     } else if (event === 'afterChange') {
-      this.afterChangeHooks.push(<NormalHook>handler);
+      this.afterChangeHooks.push(handler);
     }
   }
 
-  off(event: 'beforeChange', handler: GuardHook, { once }?: { once?: boolean }): void;
+  off(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
 
   off(event: 'update', handler: UpdateHook): void;
 
   off(event: 'afterChange', handler: NormalHook): void;
 
-  off(event: string, handler: GuardHook | UpdateHook | NormalHook, { once = false } = {}): void {
+  off(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
     if (event === 'beforeChange') {
-      if (once) {
-        handler = <GuardHook>(<GuardHook>handler)._beforeChangeOnce;
-      }
-
       this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
+    } else if(event === 'beforeCurrentRouteLeave' && this.current) {
+      this.current._beforeLeaveHooks = this.current._beforeLeaveHooks.filter(fn => fn !== handler);
     } else if (event === 'update') {
       this.updateHooks = this.updateHooks.filter(fn => fn !== handler);
     } else if (event === 'afterChange') {

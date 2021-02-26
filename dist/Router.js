@@ -25,13 +25,13 @@ class HookInterrupt extends Error {
     }
 }
 export default class Router {
-    constructor({ routes, base, pathParam, mode = detectedMode }) {
+    constructor({ routes, base, pathQuery, mode = detectedMode }) {
         this.beforeChangeHooks = [];
         this.afterChangeHooks = [];
         this.updateHooks = [];
         this.urlRouter = new UrlRouter(this.flatRoutes(routes));
         this.base = base;
-        this.pathParam = pathParam;
+        this.pathQuery = pathQuery;
         this.mode = mode;
         this.onPopStateWrapper = () => this.onPopState();
         if (this.mode === 'client') {
@@ -66,7 +66,7 @@ export default class Router {
         }
         return result;
     }
-    handle(location, serverContext) {
+    handle(location, ssrContext) {
         return Promise.resolve().then(() => {
             const loc = this.parseLocation(location);
             const matchedURLRoute = this.urlRouter.find(loc.path);
@@ -91,7 +91,7 @@ export default class Router {
                 this.emit('update', route);
                 this.emit('afterChange', route, this.current);
                 if (this.mode === 'server') {
-                    return Promise.all(preloadFns.map(preload => preload(route, serverContext))).then(() => ({
+                    return Promise.all(preloadFns.map(preload => preload(route, ssrContext))).then(() => ({
                         route,
                         preloadData
                     }));
@@ -117,15 +117,15 @@ export default class Router {
         if (location.hash) {
             url.hash = location.hash;
         }
-        // `base` and `pathParam` only has effect on absolute URL.
-        // `base` and `pathParam` are mutually exclusive.
+        // `base` and `pathQuery` only has effect on absolute URL.
+        // `base` and `pathQuery` are mutually exclusive.
         if (/^\w+:/.test(location.path)) {
             if (this.base && url.pathname.startsWith(this.base)) {
                 url.pathname = url.pathname.slice(this.base.length);
             }
-            else if (this.pathParam) {
-                url.pathname = url.searchParams.get(this.pathParam) || '/';
-                url.searchParams.delete(this.pathParam);
+            else if (this.pathQuery) {
+                url.pathname = url.searchParams.get(this.pathQuery) || '/';
+                url.searchParams.delete(this.pathQuery);
             }
         }
         url.searchParams.sort?.();
@@ -133,8 +133,12 @@ export default class Router {
     }
     // If `base` is not ends with '/', and path is root ('/'), the ending slash will be trimmed.
     internalURLtoHref(url) {
-        if (this.pathParam) {
-            return url.search + url.hash;
+        if (this.pathQuery) {
+            const u = new URL(url.href);
+            if (url.pathname !== '/') {
+                u.searchParams.set(this.pathQuery, url.pathname);
+            }
+            return u.search + u.hash;
         }
         else {
             return (this.base
@@ -360,20 +364,12 @@ export default class Router {
     forward(state) {
         return this.go(1, state);
     }
-    on(event, handler, { once = false, beginning = false } = {}) {
+    on(event, handler) {
         if (event === 'beforeChange') {
-            if (once) {
-                handler = handler._beforeChangeOnce = (to, from) => {
-                    this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
-                    return handler(to, from);
-                };
-            }
-            if (beginning) {
-                this.beforeChangeHooks.unshift(handler);
-            }
-            else {
-                this.beforeChangeHooks.push(handler);
-            }
+            this.beforeChangeHooks.push(handler);
+        }
+        else if (event === 'beforeCurrentRouteLeave') {
+            this.current?._beforeLeaveHooks.push(handler);
         }
         else if (event === 'update') {
             this.updateHooks.push(handler);
@@ -382,12 +378,12 @@ export default class Router {
             this.afterChangeHooks.push(handler);
         }
     }
-    off(event, handler, { once = false } = {}) {
+    off(event, handler) {
         if (event === 'beforeChange') {
-            if (once) {
-                handler = handler._beforeChangeOnce;
-            }
             this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
+        }
+        else if (event === 'beforeCurrentRouteLeave' && this.current) {
+            this.current._beforeLeaveHooks = this.current._beforeLeaveHooks.filter(fn => fn !== handler);
         }
         else if (event === 'update') {
             this.updateHooks = this.updateHooks.filter(fn => fn !== handler);
