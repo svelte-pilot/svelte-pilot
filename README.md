@@ -865,5 +865,19 @@ router.off(event, hook)
 
 Removes the specified event hook.
 
+## Get current route and router instance in components
+
+```svelte
+<script>
+  import { getContext } from 'svelte';
+
+  const router = getContext('__SVELTE_PILOT_ROUTER__');
+  router.push('/foo');
+
+  const routeStore = getContext('__SVELTE_PILOT_ROUTE__');
+  console.log($routeStore.path);
+</script>
+```
+
 ## License
 [MIT](LICENSE)
