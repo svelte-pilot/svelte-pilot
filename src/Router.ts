@@ -87,7 +87,7 @@ type HandlerResult = {
   preloadData: PreloadData | null
 } | null;
 
-const detectedMode = typeof window === 'object' ? 'client' : 'server';
+const detectedMode = typeof window === 'object' && window.history ? 'client' : 'server';
 
 function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
   if (q instanceof URLSearchParams) {
