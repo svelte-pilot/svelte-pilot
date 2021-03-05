@@ -1,6 +1,6 @@
 import UrlRouter from 'url-router';
 import { StringCaster } from 'cast-string';
-const detectedMode = typeof window === 'object' ? 'client' : 'server';
+const detectedMode = typeof window === 'object' && window.history ? 'client' : 'server';
 function appendSearchParams(searchParams, q) {
     if (q instanceof URLSearchParams) {
         q.forEach((val, key) => searchParams.append(key, val));
