@@ -1,27 +1,27 @@
 import { SvelteComponent } from 'svelte';
 import { StringCaster } from 'cast-string';
-declare type PrimitiveType = string | number | boolean | null | undefined;
-declare type SerializableObject = {
+export declare type PrimitiveType = string | number | boolean | null | undefined;
+export declare type SerializableObject = {
     [name: string]: PrimitiveType | PrimitiveType[] | {
         [name: string]: SerializableObject;
     };
 };
-declare type ComponentModule = {
+export declare type ComponentModule = {
     default: typeof SvelteComponent;
     preload?: PreloadFn;
     beforeEnter?: GuardHook;
 };
-declare type SyncComponent = ComponentModule | typeof SvelteComponent;
-declare type AsyncComponent = () => Promise<SyncComponent>;
-declare type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
-declare type PropSetters = Array<(route: Route) => SerializableObject>;
-declare type PreloadData = {
+export declare type SyncComponent = ComponentModule | typeof SvelteComponent;
+export declare type AsyncComponent = () => Promise<SyncComponent>;
+export declare type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
+export declare type PropSetters = Array<(route: Route) => SerializableObject>;
+export declare type PreloadData = {
     data?: SerializableObject;
     children?: Record<string, PreloadData>;
 };
-declare type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
-declare type KeyFn = (route: Route) => PrimitiveType;
-declare type RouterViewDef = {
+export declare type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+export declare type KeyFn = (route: Route) => PrimitiveType;
+export declare type RouterViewDef = {
     name?: string;
     path?: string;
     component?: SyncComponent | AsyncComponent;
@@ -32,23 +32,23 @@ declare type RouterViewDef = {
     beforeEnter?: GuardHook;
     beforeLeave?: GuardHook;
 };
-declare type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
-declare type RouterViewResolved = {
+export declare type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
+export declare type RouterViewResolved = {
     name: string;
     component?: SyncComponent;
     props?: SerializableObject;
     key?: PrimitiveType;
     children?: Record<string, RouterViewResolved>;
 };
-declare type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
-declare type Location = {
+export declare type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
+export declare type Location = {
     path: string;
     params?: Record<string, string | number | boolean>;
     query?: Query;
     hash?: string;
     state?: SerializableObject;
 };
-declare type Route = {
+export declare type Route = {
     path: string;
     query: StringCaster;
     search: string;
@@ -63,12 +63,12 @@ declare type Route = {
     _propSetters: PropSetters;
     _keySetters: KeyFn[];
 };
-declare type GuardHookResult = void | boolean | string | Location;
-declare type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
-declare type NormalHook = (to: Route, from?: Route) => void;
-declare type UpdateHook = (route: Route) => void;
-declare type Mode = 'server' | 'client';
-declare type HandlerResult = {
+export declare type GuardHookResult = void | boolean | string | Location;
+export declare type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
+export declare type NormalHook = (to: Route, from?: Route) => void;
+export declare type UpdateHook = (route: Route) => void;
+export declare type Mode = 'server' | 'client';
+export declare type HandlerResult = {
     route: Route;
     preloadData: PreloadData | null;
 } | null;
@@ -124,4 +124,3 @@ export default class Router {
     off(event: 'afterChange', handler: NormalHook): void;
     private emit;
 }
-export {};
