@@ -15,10 +15,11 @@ export declare type SyncComponent = ComponentModule | typeof SvelteComponent;
 export declare type AsyncComponent = () => Promise<SyncComponent>;
 export declare type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
 export declare type PropSetters = Array<(route: Route) => SerializableObject>;
-export declare type PreloadData = {
+declare type SSRStateNode = {
     data?: SerializableObject;
-    children?: Record<string, PreloadData>;
+    children?: SSRState;
 };
+export declare type SSRState = Record<string, SSRStateNode>;
 export declare type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
 export declare type KeyFn = (route: Route) => PrimitiveType;
 export declare type RouterViewDef = {
@@ -70,7 +71,7 @@ export declare type UpdateHook = (route: Route) => void;
 export declare type Mode = 'server' | 'client';
 export declare type HandlerResult = {
     route: Route;
-    preloadData: PreloadData | null;
+    ssrState: SSRState | null;
 } | null;
 export default class Router {
     private base?;
@@ -124,3 +125,4 @@ export default class Router {
     off(event: 'afterChange', handler: NormalHook): void;
     private emit;
 }
+export {};

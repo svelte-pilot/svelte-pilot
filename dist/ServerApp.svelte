@@ -6,7 +6,7 @@
 
   export let router;
   export let route;
-  export let preloadData = null;
+  export let ssrState = null;
 
   setContext(CTX_ROUTER, router);
   setContext(CTX_ROUTE, { subscribe: writable(route).subscribe });
@@ -14,7 +14,7 @@
   setContext(CTX_CHILDREN, {
     subscribe: writable({
       routerViews: route._routerViews,
-      preloadData
+      ssrState
     }).subscribe
   });
 </script>

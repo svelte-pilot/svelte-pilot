@@ -10,21 +10,17 @@
   const childrenStore = writable();
   setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe });
 
-  const unsubscribe = parentStore.subscribe(({ routerViews, preloadData } = {}) => {
+  const unsubscribe = parentStore.subscribe(({ routerViews, ssrState } = {}) => {
     view = routerViews?.[name];
 
-    if (preloadData) {
-      props = {
-        ...view?.props,
-        ...preloadData?.[name]
-      };
-    } else {
-      props = view?.props || {};
-    }
+    props = {
+      ...view?.props,
+      ...ssrState?.[name].data
+    };
 
     childrenStore.set({
       routerViews: view?.children,
-      preloadData: preloadData?.children
+      ssrState: ssrState?.[name].children
     });
   });
 

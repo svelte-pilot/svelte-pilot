@@ -5,7 +5,7 @@
   import { CTX_CHILDREN, CTX_ROUTER, CTX_ROUTE } from './ctxKeys';
 
   export let router;
-  export let preloadData = null;
+  export let ssrState = null;
 
   const childrenStore = writable();
   const routeStore = writable();
@@ -23,16 +23,16 @@
   function update(route) {
     childrenStore.set({
       routerViews: route._routerViews,
-      preloadData
+      ssrState
     });
 
     routeStore.set(route);
 
     updateCount++;
 
-    if (preloadData && updateCount === 2) {
-      Object.keys(preloadData).forEach(k => delete preloadData[k]);
-      preloadData = null;
+    if (ssrState && updateCount === 2) {
+      Object.keys(ssrState).forEach(k => delete ssrState[k]);
+      ssrState = null;
     }
   }
 </script>

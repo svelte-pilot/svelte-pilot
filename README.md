@@ -125,7 +125,7 @@ export async function render(url: string, ssrContext: unknown): Promise<Response
     return null;
   }
 
-  const { route, preloadData } = matchedRoute;
+  const { route, ssrState } = matchedRoute;
   const res = (route.meta.response || {}) as Response;
 
   if (res?.headers?.location) {
@@ -135,7 +135,7 @@ export async function render(url: string, ssrContext: unknown): Promise<Response
 
     return res;
   } else {
-    const body = ServerApp.render({ router, route, preloadData });
+    const body = ServerApp.render({ router, route, ssrState });
 
     res.body = {
       ...body,
@@ -223,8 +223,8 @@ new ClientApp({
   props: {
     router,
 
-    // Suppose we save the preloadData as `window.__PRELOAD_DATA__`
-    preloadData: window.__PRELOAD_DATA__
+    // Suppose we save the ssrState as `window.__SSR_STATE__`
+    ssrState: window.__SSR_STATE__
   }
 });
 ```
@@ -745,12 +745,12 @@ An object contains:
 ```ts
 {
   route,
-  preloadData
+  ssrState
 }
 ```
 
 * `route`: [Route](#route-object) object.
-* `preloadData`: A serializable object. It is used to inject into the html for hydration by the client side.
+* `ssrState`: A serializable object. It is used to inject into the html for hydration by the client side.
 
 ### router.parseLocation()
 

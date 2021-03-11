@@ -73,7 +73,7 @@ export default class Router {
             if (!matchedURLRoute) {
                 return null;
             }
-            const { routerViews, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, preloadData } = this.resolveRoute(matchedURLRoute.handler);
+            const { routerViews, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, ssrState } = this.resolveRoute(matchedURLRoute.handler);
             const route = {
                 ...loc,
                 params: new StringCaster(matchedURLRoute.params),
@@ -93,14 +93,14 @@ export default class Router {
                 if (this.mode === 'server') {
                     return Promise.all(preloadFns.map(preload => preload(route, ssrContext))).then(() => ({
                         route,
-                        preloadData
+                        ssrState
                     }));
                 }
                 else {
                     this.current = route;
                     return {
                         route,
-                        preloadData: null
+                        ssrState: null
                     };
                 }
             })));
@@ -203,12 +203,16 @@ export default class Router {
         const beforeLeaveHooks = [];
         const asyncComponentPromises = [];
         const preloadFns = [];
-        const preloadData = this.mode === 'server' ? {} : null;
+        const ssrState = this.mode === 'server' ? {} : null;
         let children = routerViews;
+        let childState = ssrState;
         for (const stack of stacks) {
-            this.resolveRouterViews(stack, true, children, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, preloadData);
+            this.resolveRouterViews(stack, true, children, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, childState);
             const linkViewName = stack[stack.length - 1].name || 'default';
             children = children[linkViewName].children = {};
+            if (childState) {
+                childState = childState[linkViewName].children = {};
+            }
         }
         return {
             routerViews,
@@ -219,10 +223,10 @@ export default class Router {
             beforeLeaveHooks,
             asyncComponentPromises,
             preloadFns,
-            preloadData
+            ssrState
         };
     }
-    resolveRouterViews(stack, skipLastViewChildren, routerViews, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, preloadData) {
+    resolveRouterViews(stack, skipLastViewChildren, routerViews, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, ssrState) {
         stack.forEach(routerViewDef => {
             const { name = 'default', component, props, key, meta, beforeEnter, beforeLeave, children } = routerViewDef;
             const routerView = routerViews[name] = { name };
@@ -246,12 +250,15 @@ export default class Router {
             if (key) {
                 keySetters.push(route => routerView.key = key(route));
             }
+            if (ssrState) {
+                ssrState[name] = {};
+            }
             if (component instanceof Function && !component.prototype) {
                 const promise = component();
                 promise.then(component => {
                     routerViewDef.component = routerView.component = component;
-                    if (routerView.component.preload && preloadData) {
-                        pushPreloadFn(routerView.component.preload, preloadData);
+                    if (routerView.component.preload && ssrState) {
+                        pushPreloadFn(routerView.component.preload, ssrState[name]);
                     }
                 });
                 asyncComponentPromises.push(promise);
@@ -261,16 +268,16 @@ export default class Router {
                 if (routerView.component?.beforeEnter) {
                     beforeEnterHooks.push(routerView.component.beforeEnter);
                 }
-                if (routerView.component?.preload && preloadData) {
-                    pushPreloadFn(routerView.component.preload, preloadData);
+                if (routerView.component?.preload && ssrState) {
+                    pushPreloadFn(routerView.component.preload, ssrState[name]);
                 }
             }
-            function pushPreloadFn(preload, preloadData) {
-                preloadFns.push((route, ctx) => preload(routerView.props || {}, route, ctx).then(data => preloadData.data = data));
+            function pushPreloadFn(preload, ssrState) {
+                preloadFns.push((route, ctx) => preload(routerView.props || {}, route, ctx).then(data => ssrState.data = data));
             }
             if (children && (!skipLastViewChildren || routerViewDef !== stack[stack.length - 1])) {
                 routerView.children = {};
-                this.resolveRouterViews(children.filter((v) => !(v instanceof Array) && !v.path), false, routerView.children, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, preloadData ? preloadData.children = {} : null);
+                this.resolveRouterViews(children.filter((v) => !(v instanceof Array) && !v.path), false, routerView.children, metaSetters, propSetters, keySetters, beforeEnterHooks, beforeLeaveHooks, asyncComponentPromises, preloadFns, ssrState ? ssrState[name].children = {} : null);
             }
         });
     }
