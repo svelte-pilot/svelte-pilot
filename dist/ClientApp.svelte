@@ -21,19 +21,19 @@
   let updateCount = 0;
 
   function update(route) {
-    childrenStore.set({
-      routerViews: route._routerViews,
-      ssrState
-    });
-
-    routeStore.set(route);
-
     updateCount++;
 
     if (ssrState && updateCount === 2) {
       Object.keys(ssrState).forEach(k => delete ssrState[k]);
       ssrState = null;
     }
+
+    childrenStore.set({
+      routerViews: route._routerViews,
+      ssrState
+    });
+
+    routeStore.set(route);
   }
 </script>
 
