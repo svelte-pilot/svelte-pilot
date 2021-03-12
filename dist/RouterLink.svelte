@@ -1,6 +1,7 @@
 <script>
   import { getContext } from 'svelte';
   import isEqual from 'lodash-es/isEqual';
+  import { CTX_ROUTER, CTX_ROUTE } from './ctxKeys';
 
   let className = '';
   export { className as class };
