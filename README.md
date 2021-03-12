@@ -101,50 +101,47 @@ new ClientApp({
 
 #### Server entry
 
-`entry-server.ts`:
+`entry-server.js`:
 
-```ts
+```js
 import { ServerApp } from 'svelte-pilot';
+import serialize from 'serialize-javascript';
 import router from './router';
 
-type Response = {
-  status?: number,
-  headers?: Record<string, string>,
-
-  body: {
-    head?: string,
-    html?: string,
-    css?: string
-  }
-};
-
-export async function render(url: string, ssrContext: unknown): Promise<Response | null> {
-  const matchedRoute = await router.handle(url, ssrContext);
+export async function render(url, ssrCtx) {
+  const matchedRoute = await router.handle(url, ssrCtx);
 
   if (!matchedRoute) {
     return null;
   }
 
   const { route, ssrState } = matchedRoute;
-  const res = (route.meta.response || {}) as Response;
 
-  if (res?.headers?.location) {
-    if (!res.status) {
+  const res = Object.assign({
+    status: 200,
+    headers: {},
+
+    body: {
+      head: '',
+      css: '',
+      html: ''
+    }
+  }, route.meta.response);
+
+  if (res.headers.location) {
+    if (res.status === 200) {
       res.status = 301;
     }
 
     return res;
   } else {
     const body = ServerApp.render({ router, route, ssrState });
+    body.html += `<script>__SSR_STATE__ = ${serialize(ssrState)}</script>`;
 
     res.body = {
       ...body,
       css: body.css.code
     };
-
-    if (!res.status) {
-      res.status = 200;
-    }
 
     return res;
   }
@@ -160,57 +157,88 @@ export async function render(url: string, ssrContext: unknown): Promise<Response
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/favicon.png">
-    <title>Title</title>
+    <script type="module" src="/entry-client.ts"></script>
     <!--ssr-head-->
     <!--ssr-css-->
   </head>
 
   <body>
     <!--ssr-html-->
-    <script type="module" src="/entry-client.ts"></script>
   </body>
 </html>
 ```
 
-Your server code need to call the `render()` function, then inject the returned `head`, `css`, and `html` string into
+Your server side code need to call the `render()` function, then inject the returned `head`, `css`, and `html` string into
 the `index.html` file.
 
-Svelte component should export `preload` function to fetch the data.
+Svelte component should export a `preload` function to fetch the data on server side.
 
 `preload` function arguments:
 * `props`: `props` defined in the RouterView config.
 * `route`: The current [Route](#route-object) object.
 * `ssrContext`: anything you passed to `router.handle()`.
 
-```svelte
+The returned state object will be passed to component props.
+On client side, when a navigation is triggered (back or forward, router.push(), router.replace(), router.setState()),
+the state object will be purged.
+
+```html
 <script context="module">
   import Child, { preload as preloadChild } from './Child.svelte';
 
-  export async function preload(props, route, ssrContext) {
-    // Fetch data and return.
-    // The data will be pass to component props.
+  export async function preload(props, route, ssrCtx) {
+    // Mock http request
+    const ssrState = await fetchData(props.page, token: ssrCtx.cookies.token);
+    
+    // Preload child component
+    const childState = await preloadChild({ foo: ssrState.foo }, route, ssrCtx);
 
-    const childData = await preloadChild({ /*...*/ }, route, ssrContext);
+    // Set response headers. Optional
+    route.meta.response = {
+      status: 200,
 
+      headers: {
+        'X-Foo': 'Bar'
+      }
+    };
+
+    // Returned data will be passed to component props
     return {
-      content: 'hello world',
-      childData
-    }
+      ssrState,
+      childState
+    };
   }
 </script>
 
 <script>
-  export let content;
-  export let childData;
+  export let page;
+  export let ssrState;
+  export let childState;
+
+  let data;
+
+  $: onPageChange(page);
+
+  async function onPageChange(page) {
+    if (ssrState) {
+      // Initial rendering
+      data = ssrState;
+    } else {
+      // CSR mode, or navigation is triggered.
+      data = await fetchData(page, getCookie('token'));
+    }
+  }
 </script>
 
-<h1>{content}</h1>
-<Child data={childData} />
+{#if data}
+  <div>{data.content}</div>
+  <Child foo={data.foo} {...childState} />
+{/if}
 ```
 
 #### Client entry
 
-`entry-client.ts`:
+`entry-client.js`:
 
 ```ts
 import { ClientApp } from 'svelte-pilot';
@@ -222,8 +250,6 @@ new ClientApp({
 
   props: {
     router,
-
-    // Suppose we save the ssrState as `window.__SSR_STATE__`
     ssrState: window.__SSR_STATE__
   }
 });
@@ -416,7 +442,7 @@ const routes = [
 
 `Root.svelte`:
 
-```svelte
+```html
 <script>
 import { RouterView } from 'svelte-pilot';
 </script>
@@ -455,7 +481,7 @@ const routes = [
 
 `Root.svelte`:
 
-```svelte
+```html
 <script>
   import { RouterView } from 'svelte-pilot';
 </script>
@@ -704,7 +730,7 @@ module's [parse()](https://nodejs.org/api/querystring.html#querystring_querystri
 ## \<RouterLink>
 A navigation component. It renders an `<a>` element.
 
-```svelte
+```html
 <script>
   import { RouterLink } from 'svelte-pilot';
 </script>
@@ -867,7 +893,7 @@ Removes the specified event hook.
 
 ## Get current route and router instance in components
 
-```svelte
+```html
 <script>
   import { getContext } from 'svelte';
 
