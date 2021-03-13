@@ -1,13 +1,10 @@
 # svelte-pilot
 A svelte router with SSR (Server-Side Rendering) support.
 
-<!-- @import "[TOC]" {cmd="toc" depthFrom=2 depthTo=6 orderedList=false} -->
-
-<!-- code_chunk_output -->
 
 - [Install](#install)
 - [Usage](#usage)
-  - [Client-Side Rendering Only](#client-side-rendering-only)
+  - [Client-Side Rendering](#client-side-rendering)
   - [Server-Side Rendering](#server-side-rendering)
     - [Server entry](#server-entry)
     - [Client entry](#client-entry)
@@ -25,8 +22,6 @@ A svelte router with SSR (Server-Side Rendering) support.
     - [Share meta data between `RouterView`s](#share-meta-data-between-routerviews)
     - [Force re-rendering](#force-re-rendering)
     - [`beforeEnter` guard hook](#beforeenter-guard-hook)
-      - [Params:](#params)
-      - [Returns:](#returns)
     - [`beforeLeave` guard hook](#beforeleave-guard-hook)
   - [base](#base)
   - [pathQuery](#pathquery)
@@ -52,8 +47,6 @@ A svelte router with SSR (Server-Side Rendering) support.
   - [router.current](#routercurrent)
 - [Methods](#methods)
   - [router.handle()](#routerhandle)
-    - [Params](#params-3)
-    - [Returns](#returns-1)
   - [router.parseLocation()](#routerparselocation)
   - [router.href()](#routerhref)
   - [router.push()](#routerpush)
@@ -65,9 +58,8 @@ A svelte router with SSR (Server-Side Rendering) support.
   - [router.on()](#routeron)
     - [Hooks running order](#hooks-running-order)
   - [router.off()](#routeroff)
+- [Get current route and router instance in components](#get-current-route-and-router-instance-in-components)
 - [License](#license)
-
-<!-- /code_chunk_output -->
 
 ## Install
 ```
@@ -78,7 +70,7 @@ npm install svelte-pilot
 
 Checkout [svelte-vite-ssr](https://github.com/jiangfengming/svelte-vite-ssr) template.
 
-### Client-Side Rendering Only
+### Client-Side Rendering
 
 `entry-server.ts`:
 ```ts
@@ -179,7 +171,7 @@ Svelte component should export a `preload` function to fetch the data on server 
 * `ssrContext`: anything you passed to `router.handle()`.
 
 The returned state object will be passed to component props.
-On client side, when a navigation is triggered (back or forward, router.push(), router.replace(), router.setState()),
+On the client side, when a navigation is triggered through `history.pushState` / `history.replaceState` / `popstate` event,
 the state object will be purged.
 
 ```html
@@ -224,7 +216,7 @@ the state object will be purged.
       // Initial rendering
       data = ssrState;
     } else {
-      // CSR mode, or navigation is triggered.
+      // A navigation is triggered through history.pushState / history.popState / popstate event.
       data = await fetchData(page, getCookie('token'));
     }
   }
