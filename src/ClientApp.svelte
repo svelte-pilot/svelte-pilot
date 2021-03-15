@@ -18,14 +18,16 @@
     update(router.current);
   }
 
-  let updateCount = 0;
+  let removeSSRState = false;
 
   function update(route) {
-    updateCount++;
-
-    if (ssrState && updateCount === 2) {
-      Object.keys(ssrState).forEach(k => delete ssrState[k]);
-      ssrState = null;
+    if (ssrState) {
+      if (removeSSRState) {
+        Object.keys(ssrState).forEach(k => delete ssrState[k]);
+        ssrState = null;
+      } else {
+        removeSSRState = true;
+      }
     }
 
     childrenStore.set({

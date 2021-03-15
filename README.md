@@ -163,9 +163,9 @@ export async function render(url, ssrCtx) {
 Your server side code need to call the `render()` function, then inject the returned `head`, `css`, and `html` string into
 the `index.html` file.
 
-Svelte component should export a `preload` function to fetch the data on server side.
+Svelte component should export a `load` function to fetch the data on server side.
 
-`preload` function arguments:
+`load` function arguments:
 * `props`: `props` defined in the RouterView config.
 * `route`: The current [Route](#route-object) object.
 * `ssrContext`: anything you passed to `router.handle()`.
@@ -176,14 +176,14 @@ the state object will be purged.
 
 ```html
 <script context="module">
-  import Child, { preload as preloadChild } from './Child.svelte';
+  import Child, { load as loadChild } from './Child.svelte';
 
-  export async function preload(props, route, ssrCtx) {
+  export async function load(props, route, ssrCtx) {
     // Mock http request
     const ssrState = await fetchData(props.page, token: ssrCtx.cookies.token);
     
-    // Preload child component
-    const childState = await preloadChild({ foo: ssrState.foo }, route, ssrCtx);
+    // load child component
+    const childState = await loadChild({ foo: ssrState.foo }, route, ssrCtx);
 
     // Set response headers. Optional
     route.meta.response = {
@@ -207,16 +207,14 @@ the state object will be purged.
   export let ssrState;
   export let childState;
 
-  let data;
+  // Initialize data from SSR state.
+  let data = ssrState;
 
   $: onPageChange(page);
 
   async function onPageChange(page) {
-    if (ssrState) {
-      // Initial rendering
-      data = ssrState;
-    } else {
-      // A navigation is triggered through history.pushState / history.popState / popstate event.
+    // SSR state will be set to undefined when history.pushState / history.replaceState / popstate event is called.
+    if (!ssrState) {
       data = await fetchData(page, getCookie('token'));
     }
   }
@@ -290,11 +288,11 @@ type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHoo
 
 type ComponentModule = {
   default: typeof SvelteComponent,
-  preload?: PreloadFn,
+  load?: LoadFn,
   beforeEnter?: GuardHook
 };
 
-type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
 type GuardHookResult = void | boolean | string | Location;
 
 type Location = {
@@ -755,7 +753,7 @@ Manually handle the route. Used in `server` mode. See [Server-Side Rendering](#s
 
 #### Params
 * location: [Locaton](#location-object) or path string.
-* ssrContext: `any`. I will be passed to the `preload` function.
+* ssrContext: `any`. I will be passed to the `load` function.
 
 #### Returns
 An object contains:

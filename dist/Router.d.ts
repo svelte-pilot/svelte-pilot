@@ -8,7 +8,7 @@ export declare type SerializableObject = {
 };
 export declare type ComponentModule = {
     default: typeof SvelteComponent;
-    preload?: PreloadFn;
+    load?: LoadFn;
     beforeEnter?: GuardHook;
 };
 export declare type SyncComponent = ComponentModule | typeof SvelteComponent;
@@ -20,7 +20,7 @@ declare type SSRStateNode = {
     children?: SSRState;
 };
 export declare type SSRState = Record<string, SSRStateNode>;
-export declare type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+export declare type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
 export declare type KeyFn = (route: Route) => PrimitiveType;
 export declare type RouterViewDef = {
     name?: string;

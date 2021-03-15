@@ -7,7 +7,7 @@ export type SerializableObject = { [name: string]: PrimitiveType | PrimitiveType
 
 export type ComponentModule = {
   default: typeof SvelteComponent,
-  preload?: PreloadFn,
+  load?: LoadFn,
   beforeEnter?: GuardHook
 };
 
@@ -23,8 +23,8 @@ type SSRStateNode = {
 
 export type SSRState = Record<string, SSRStateNode>;
 
-export type PreloadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
-type PreloadFnWrapper = (route: Route, ssrContext?: unknown) => void;
+export type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
 export type KeyFn = (route: Route) => PrimitiveType;
 
 export type RouterViewDef = {
@@ -212,7 +212,7 @@ export default class Router {
         beforeEnterHooks,
         beforeLeaveHooks,
         asyncComponentPromises,
-        preloadFns,
+        loadFns,
         ssrState
       } = this.resolveRoute(matchedURLRoute.handler);
 
@@ -245,7 +245,7 @@ export default class Router {
 
                 if (this.mode === 'server') {
                   return Promise.all(
-                    preloadFns.map(preload => preload(route, ssrContext))
+                    loadFns.map(load => load(route, ssrContext))
                   ).then(() => ({
                     route,
                     ssrState
@@ -381,7 +381,7 @@ export default class Router {
     const beforeEnterHooks: GuardHook[] = [];
     const beforeLeaveHooks: GuardHook[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
-    const preloadFns: PreloadFnWrapper[] = [];
+    const loadFns: LoadFnWrapper[] = [];
     const ssrState: SSRState | null = this.mode === 'server' ? {} : null;
 
     let children = routerViews;
@@ -398,7 +398,7 @@ export default class Router {
         beforeEnterHooks,
         beforeLeaveHooks,
         asyncComponentPromises,
-        preloadFns,
+        loadFns,
         childState
       );
 
@@ -418,7 +418,7 @@ export default class Router {
       beforeEnterHooks,
       beforeLeaveHooks,
       asyncComponentPromises,
-      preloadFns,
+      loadFns,
       ssrState
     };
   }
@@ -433,7 +433,7 @@ export default class Router {
     beforeEnterHooks: GuardHook[],
     beforeLeaveHooks: GuardHook[],
     asyncComponentPromises: Promise<SyncComponent>[],
-    preloadFns: PreloadFnWrapper[],
+    loadFns: LoadFnWrapper[],
     ssrState: SSRState | null
   ): void {
     stack.forEach(routerViewDef => {
@@ -474,8 +474,8 @@ export default class Router {
         promise.then(component => {
           routerViewDef.component = routerView.component = <ComponentModule>component;
 
-          if (routerView.component.preload && ssrState) {
-            pushPreloadFn(routerView.component.preload, ssrState[name]);
+          if (routerView.component.load && ssrState) {
+            pushLoadFn(routerView.component.load, ssrState[name]);
           }
         });
 
@@ -487,14 +487,14 @@ export default class Router {
           beforeEnterHooks.push(routerView.component.beforeEnter);
         }
 
-        if (routerView.component?.preload && ssrState) {
-          pushPreloadFn(routerView.component.preload, ssrState[name]);
+        if (routerView.component?.load && ssrState) {
+          pushLoadFn(routerView.component.load, ssrState[name]);
         }
       }
 
-      function pushPreloadFn(preload: PreloadFn, ssrState: SSRState) {
-        preloadFns.push(
-          (route, ctx) => preload(routerView.props || {}, route, ctx).then(data => ssrState.data = data)
+      function pushLoadFn(load: LoadFn, ssrState: SSRState) {
+        loadFns.push(
+          (route, ctx) => load(routerView.props || {}, route, ctx).then(data => ssrState.data = data)
         );
       }
 
@@ -511,7 +511,7 @@ export default class Router {
           beforeEnterHooks,
           beforeLeaveHooks,
           asyncComponentPromises,
-          preloadFns,
+          loadFns,
           ssrState ? ssrState[name].children = {} : null
         );
       }
