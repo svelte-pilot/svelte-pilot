@@ -618,6 +618,28 @@ If your application is serving under `https://www.example.com/app/`, then the `b
 If you want the root path not end with slash, you can set the base without ending slash, like `/app`.
 Defaults to `/`.
 
+Note, when using `router.push()`, `router.replace()` and `router.handle()`, Only if you pass an absolute URL (starting with protocol),
+The base part will be trimmed when matching the route.
+
+```js
+const router = new Router({
+  base: '/app',
+  
+  routes: [
+    {
+      path: '/bar',
+      component: () => import('./Bar.svelte')
+    }
+  ]
+});
+
+// works
+router.handle('http://127.0.0.1/app/bar');
+
+// won't work
+router.handler('/app/bar');
+```
+
 ### pathQuery
 `string`. Optional. Uses the query name as router path.
 It is useful when serving the application under `file:` protocol.
