@@ -3,7 +3,10 @@ import UrlRouter from 'url-router';
 import { StringCaster } from 'cast-string';
 
 export type PrimitiveType = string | number | boolean | null | undefined;
-export type SerializableObject = { [name: string]: PrimitiveType | PrimitiveType[] | { [name: string]: SerializableObject } };
+
+export type SerializableObject = {
+  [name: string]: PrimitiveType | PrimitiveType[] | { [name: string]: SerializableObject }
+};
 
 export type ComponentModule = {
   default: typeof SvelteComponent,
@@ -23,8 +26,11 @@ type SSRStateNode = {
 
 export type SSRState = Record<string, SSRStateNode>;
 
-export type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+export type LoadFn =
+  (props: Record<string, unknown>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+
 type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
+
 export type KeyFn = (route: Route) => PrimitiveType;
 
 export type RouterViewDef = {
@@ -67,7 +73,7 @@ export type Route = {
   hash: string,
   state: SerializableObject,
   params: StringCaster,
-  meta: Record<string, any>,
+  meta: Record<string, unknown>,
   href: string,
   _routerViews: Record<string, RouterViewResolved>
   _beforeLeaveHooks: GuardHook[],
@@ -270,9 +276,11 @@ export default class Router {
       location = { path: location };
     }
 
-    const url = new URL(
-      location.path.replace(/:([a-z]\w*)/ig, (_, w) => encodeURIComponent(<string>(<Location>location).params?.[w])),
-      'file:'
+    const url = new URL(location.path, 'file:');
+
+    url.pathname = url.pathname.replace(
+      /:([a-z]\w*)/ig,
+      (_, w) => encodeURIComponent(<string>(<Location>location).params?.[w])
     );
 
     if (location.query) {
@@ -321,7 +329,14 @@ export default class Router {
     }
   }
 
-  parseLocation(location: string | Location) {
+  parseLocation(location: string | Location): {
+    path: string,
+    query: StringCaster,
+    search: string,
+    hash: string,
+    state: SerializableObject,
+    href: string
+  } {
     const url = this.locationToInternalURL(location);
 
     return {
@@ -592,13 +607,13 @@ export default class Router {
         history.replaceState(
           {
             ...result.route.state,
-            __position__: history.state.__position__
+            __position__: history.state?.__position__ || history.length
           },
           '',
           result.route.href
         );
       } else {
-        this.silentGo(<number>(<Route>this.current).state.__position__ - history.state.__position__);
+        this.silentGo(<number>(<Route> this.current).state.__position__ - history.state.__position__);
       }
     });
   }
@@ -661,7 +676,7 @@ export default class Router {
   off(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
     if (event === 'beforeChange') {
       this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
-    } else if(event === 'beforeCurrentRouteLeave' && this.current) {
+    } else if (event === 'beforeCurrentRouteLeave' && this.current) {
       this.current._beforeLeaveHooks = this.current._beforeLeaveHooks.filter(fn => fn !== handler);
     } else if (event === 'update') {
       this.updateHooks = this.updateHooks.filter(fn => fn !== handler);

@@ -110,7 +110,8 @@ export default class Router {
         if (typeof location === 'string') {
             location = { path: location };
         }
-        const url = new URL(location.path.replace(/:([a-z]\w*)/ig, (_, w) => encodeURIComponent(location.params?.[w])), 'file:');
+        const url = new URL(location.path, 'file:');
+        url.pathname = url.pathname.replace(/:([a-z]\w*)/ig, (_, w) => encodeURIComponent(location.params?.[w]));
         if (location.query) {
             appendSearchParams(url.searchParams, location.query);
         }
@@ -337,7 +338,7 @@ export default class Router {
             if (result) {
                 history.replaceState({
                     ...result.route.state,
-                    __position__: history.state.__position__
+                    __position__: history.state?.__position__ || history.length
                 }, '', result.route.href);
             }
             else {

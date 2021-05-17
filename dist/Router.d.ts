@@ -20,7 +20,7 @@ declare type SSRStateNode = {
     children?: SSRState;
 };
 export declare type SSRState = Record<string, SSRStateNode>;
-export declare type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+export declare type LoadFn = (props: Record<string, unknown>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
 export declare type KeyFn = (route: Route) => PrimitiveType;
 export declare type RouterViewDef = {
     name?: string;
@@ -56,7 +56,7 @@ export declare type Route = {
     hash: string;
     state: SerializableObject;
     params: StringCaster;
-    meta: Record<string, any>;
+    meta: Record<string, unknown>;
     href: string;
     _routerViews: Record<string, RouterViewResolved>;
     _beforeLeaveHooks: GuardHook[];
