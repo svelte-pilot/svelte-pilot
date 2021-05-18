@@ -1,10 +1,10 @@
 declare type ServerSideComponent = {
-    render: (props?: {}) => {
+    render: (props?: Record<string, unknown>) => {
         html: string;
         head: string;
         css: {
             code: string;
-            map: any;
+            map: string;
         };
     };
 };

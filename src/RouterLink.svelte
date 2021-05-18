@@ -4,6 +4,7 @@
   import { CTX_ROUTER, CTX_ROUTE } from './ctxKeys';
 
   let className = '';
+
   export { className as class };
   export let style = '';
   export let to;
