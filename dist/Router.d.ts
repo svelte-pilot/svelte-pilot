@@ -68,6 +68,13 @@ export declare type GuardHookResult = void | boolean | string | Location;
 export declare type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
 export declare type NormalHook = (to: Route, from?: Route) => void;
 export declare type UpdateHook = (route: Route) => void;
+export declare type Events = 'beforeChange' | 'beforeCurrentRouteLeave' | 'update' | 'afterChange';
+export declare type EventHooks = {
+    beforeCurrentRouteLeave: GuardHook;
+    beforeChange: GuardHook;
+    update: UpdateHook;
+    afterChange: NormalHook;
+};
 export declare type Mode = 'server' | 'client';
 export declare type HandlerResult = {
     route: Route;
@@ -117,12 +124,9 @@ export default class Router {
     go(delta: number, state?: SerializableObject): void;
     back(state?: SerializableObject): void;
     forward(state?: SerializableObject): void;
-    on(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
-    on(event: 'update', handler: UpdateHook): void;
-    on(event: 'afterChange', handler: NormalHook): void;
-    off(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
-    off(event: 'update', handler: UpdateHook): void;
-    off(event: 'afterChange', handler: NormalHook): void;
+    on(event: Events, handler: EventHooks[typeof event]): void;
+    off(event: Events, handler: EventHooks[typeof event]): void;
+    once(event: Events, handler: EventHooks[typeof event]): void;
     private emit;
 }
 export {};

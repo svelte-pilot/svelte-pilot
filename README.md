@@ -903,6 +903,10 @@ router.off(event, hook)
 
 Removes the specified event hook.
 
+### router.once()
+
+Run a hook function once.
+
 ## Get current route and router instance in components
 
 ```html

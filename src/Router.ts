@@ -87,6 +87,14 @@ export type GuardHookResult = void | boolean | string | Location;
 export type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
 export type NormalHook = (to: Route, from?: Route) => void;
 export type UpdateHook = (route: Route) => void;
+export type Events = 'beforeChange' | 'beforeCurrentRouteLeave' | 'update' | 'afterChange';
+
+export type EventHooks = {
+  beforeCurrentRouteLeave: GuardHook,
+  beforeChange: GuardHook,
+  update: UpdateHook,
+  afterChange: NormalHook
+};
 
 export type Mode = 'server' | 'client';
 
@@ -649,13 +657,7 @@ export default class Router {
     return this.go(1, state);
   }
 
-  on(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
-
-  on(event: 'update', handler: UpdateHook): void;
-
-  on(event: 'afterChange', handler: NormalHook): void;
-
-  on(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
+  on(event: Events, handler: EventHooks[typeof event]): void {
     if (event === 'beforeChange') {
       this.beforeChangeHooks.push(handler);
     } else if (event === 'beforeCurrentRouteLeave') {
@@ -667,13 +669,7 @@ export default class Router {
     }
   }
 
-  off(event: 'beforeChange' | 'beforeCurrentRouteLeave', handler: GuardHook): void;
-
-  off(event: 'update', handler: UpdateHook): void;
-
-  off(event: 'afterChange', handler: NormalHook): void;
-
-  off(event: string, handler: GuardHook | UpdateHook | NormalHook): void {
+  off(event: Events, handler: EventHooks[typeof event]): void {
     if (event === 'beforeChange') {
       this.beforeChangeHooks = this.beforeChangeHooks.filter(fn => fn !== handler);
     } else if (event === 'beforeCurrentRouteLeave' && this.current) {
@@ -683,6 +679,16 @@ export default class Router {
     } else if (event === 'afterChange') {
       this.afterChangeHooks = this.afterChangeHooks.filter(fn => fn !== handler);
     }
+  }
+
+  once(event: Events, handler: EventHooks[typeof event]): void {
+    const h: typeof handler = (...args: Parameters<typeof handler>) => {
+      this.off(event, h);
+      // @ts-expect-error Expected 1-2 arguments, but got 0 or more.
+      handler(...args);
+    };
+
+    this.on(event, h);
   }
 
   private emit(event: string, to: Route, from?: Route) {

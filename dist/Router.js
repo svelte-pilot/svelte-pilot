@@ -400,6 +400,14 @@ export default class Router {
             this.afterChangeHooks = this.afterChangeHooks.filter(fn => fn !== handler);
         }
     }
+    once(event, handler) {
+        const h = (...args) => {
+            this.off(event, h);
+            // @ts-expect-error Expected 1-2 arguments, but got 0 or more.
+            handler(...args);
+        };
+        this.on(event, h);
+    }
     emit(event, to, from) {
         if (event === 'update') {
             this.updateHooks.forEach(fn => fn(to));
