@@ -12,13 +12,13 @@
   setContext(CTX_ROUTER, router);
   setContext(CTX_ROUTE, { subscribe: routeStore.subscribe });
   setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe });
+
+  let removeSSRState = false;
   router.on('update', update);
 
   if (router.current) {
     update(router.current);
   }
-
-  let removeSSRState = false;
 
   function update(route) {
     if (ssrState) {

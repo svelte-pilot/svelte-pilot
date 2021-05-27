@@ -1,65 +1,70 @@
 # svelte-pilot
 A svelte router with SSR (Server-Side Rendering) support.
 
-
-- [Install](#install)
-- [Usage](#usage)
-  - [Client-Side Rendering](#client-side-rendering)
-  - [Server-Side Rendering](#server-side-rendering)
-    - [Server entry](#server-entry)
-    - [Client entry](#client-entry)
-- [Constructor](#constructor)
-  - [routes](#routes)
-    - [Simple routes](#simple-routes)
-    - [Dynamic import Svelte component](#dynamic-import-svelte-component)
-    - [Pass props to Svelte component](#pass-props-to-svelte-component)
-    - [Props from query string](#props-from-query-string)
-    - [Props from path params](#props-from-path-params)
-    - [Catch-all route](#catch-all-route)
-    - [Nested routes](#nested-routes)
-    - [Multiple `RouterView`s](#multiple-routerviews)
-    - [Override `RouterView`s](#override-routerviews)
-    - [Share meta data between `RouterView`s](#share-meta-data-between-routerviews)
-    - [Force re-rendering](#force-re-rendering)
-    - [`beforeEnter` guard hook](#beforeenter-guard-hook)
-    - [`beforeLeave` guard hook](#beforeleave-guard-hook)
-  - [base](#base)
-  - [pathQuery](#pathquery)
-  - [mode](#mode)
-- [Route object](#route-object)
-  - [path](#path)
-  - [params](#params-1)
-  - [search](#search)
-  - [query](#query)
-  - [hash](#hash)
-  - [href](#href)
-  - [state](#state)
-  - [meta](#meta)
-- [Location object](#location-object)
-  - [path](#path-1)
-  - [params](#params-2)
-  - [query](#query-1)
-  - [hash](#hash-1)
-  - [state](#state-1)
-- [\<RouterLink>](#routerlink)
-  - [Props](#props)
-- [Properties](#properties)
-  - [router.current](#routercurrent)
-- [Methods](#methods)
-  - [router.handle()](#routerhandle)
-  - [router.parseLocation()](#routerparselocation)
-  - [router.href()](#routerhref)
-  - [router.push()](#routerpush)
-  - [router.replace()](#routerreplace)
-  - [router.setState()](#routersetstate)
-  - [router.go()](#routergo)
-  - [router.back()](#routerback)
-  - [router.forward()](#routerforward)
-  - [router.on()](#routeron)
-    - [Hooks running order](#hooks-running-order)
-  - [router.off()](#routeroff)
-- [Get current route and router instance in components](#get-current-route-and-router-instance-in-components)
-- [License](#license)
+- [svelte-pilot](#svelte-pilot)
+  - [Install](#install)
+  - [Usage](#usage)
+    - [Client-Side Rendering](#client-side-rendering)
+    - [Server-Side Rendering](#server-side-rendering)
+      - [Server entry](#server-entry)
+      - [Client entry](#client-entry)
+  - [Constructor](#constructor)
+    - [routes](#routes)
+      - [Simple routes](#simple-routes)
+      - [Dynamic import Svelte component](#dynamic-import-svelte-component)
+      - [Pass props to Svelte component](#pass-props-to-svelte-component)
+      - [Props from query string](#props-from-query-string)
+      - [Props from path params](#props-from-path-params)
+      - [Catch-all route](#catch-all-route)
+      - [Nested routes](#nested-routes)
+      - [Multiple `RouterView`s](#multiple-routerviews)
+      - [Override `RouterView`s](#override-routerviews)
+      - [Share meta data between `RouterView`s](#share-meta-data-between-routerviews)
+      - [Force re-rendering](#force-re-rendering)
+      - [`beforeEnter` guard hook](#beforeenter-guard-hook)
+        - [Params:](#params)
+        - [Returns:](#returns)
+      - [`beforeLeave` guard hook](#beforeleave-guard-hook)
+    - [base](#base)
+    - [pathQuery](#pathquery)
+    - [mode](#mode)
+  - [Route object](#route-object)
+    - [path](#path)
+    - [params](#params-1)
+    - [search](#search)
+    - [query](#query)
+    - [hash](#hash)
+    - [href](#href)
+    - [state](#state)
+    - [meta](#meta)
+  - [Location object](#location-object)
+    - [path](#path-1)
+    - [params](#params-2)
+    - [query](#query-1)
+    - [hash](#hash-1)
+    - [state](#state-1)
+  - [\<RouterLink>](#routerlink)
+    - [Props](#props)
+  - [Properties](#properties)
+    - [router.current](#routercurrent)
+  - [Methods](#methods)
+    - [router.handle()](#routerhandle)
+      - [Params](#params-3)
+      - [Returns](#returns-1)
+    - [router.parseLocation()](#routerparselocation)
+    - [router.href()](#routerhref)
+    - [router.push()](#routerpush)
+    - [router.replace()](#routerreplace)
+    - [router.setState()](#routersetstate)
+    - [router.go()](#routergo)
+    - [router.back()](#routerback)
+    - [router.forward()](#routerforward)
+    - [router.on()](#routeron)
+      - [Hooks running order](#hooks-running-order)
+    - [router.off()](#routeroff)
+    - [router.once()](#routeronce)
+  - [Get current route and router instance in components](#get-current-route-and-router-instance-in-components)
+  - [License](#license)
 
 ## Install
 ```
@@ -72,7 +77,6 @@ Checkout [svelte-vite-ssr](https://github.com/jiangfengming/svelte-vite-ssr) tem
 
 ### Client-Side Rendering
 
-`entry-server.ts`:
 ```ts
 import { Router, ClientApp } from 'svelte-pilot';
 
@@ -91,79 +95,186 @@ new ClientApp({
 
 ### Server-Side Rendering
 
-#### Server entry
+#### Client entry
 
-`entry-server.js`:
+`client.ts`:
 
-```js
-import { ServerApp } from 'svelte-pilot';
-import serialize from 'serialize-javascript';
+```ts
+import { ClientApp, SSRState } from 'svelte-pilot';
 import router from './router';
 
-export async function render(url, ssrCtx) {
-  const matchedRoute = await router.handle(url, ssrCtx);
+declare global {
+  interface Window {
+    __SSR_STATE__: SSRState
+  }
+}
+
+// wait unitl async components loaded
+// prevent screen flash
+router.once('update', () =>
+  new ClientApp({
+    target: document.body,
+    hydrate: true,
+
+    props: {
+      router,
+      ssrState: window.__SSR_STATE__
+    }
+  })
+);
+```
+
+#### Server entry
+
+`server-render.ts`:
+
+```ts
+import { ServerApp } from 'svelte-pilot';
+import router from './router';
+
+type RenderParams = {
+  url: string,
+  ctx?: unknown,
+  template: string,
+};
+
+type RenderResult = {
+  error?: Error,
+  status: number,
+  headers?: Record<string, string>,
+  body?: string
+};
+
+export default async function(args: RenderParams): Promise<RenderResult> {
+  try {
+    return await render(args);
+  } catch (e) {
+    return {
+      error: e,
+      status: 500,
+
+      headers: {
+        'Content-Type': 'text/html',
+        'Cache-Control': 'no-store'
+      },
+
+      body: args.template // Fallback to CSR
+    };
+  }
+}
+
+async function render({ url, ctx, template }: RenderParams): Promise<RenderResult> {
+  const matchedRoute = await router.handle('http://127.0.0.1' + url, ctx);
 
   if (!matchedRoute) {
-    return null;
+    console.error('No route found for url:', url);
+
+    if (new URL(url, 'http://127.0.0.1').pathname === '/') {
+      return {
+        status: 404,
+        body: 'Page Not Found',
+        headers: { 'content-type': 'text/plain' }
+      };
+    } else {
+      return {
+        status: 301,
+
+        headers: {
+          location: '/',
+          'Cache-Control': 'no-store'
+        }
+      };
+    }
   }
 
   const { route, ssrState } = matchedRoute;
 
-  const res = Object.assign({
-    status: 200,
-    headers: {},
+  const res = route.meta.response as { status?: number, headers?: Record<string, string> } | null;
 
-    body: {
-      head: '',
-      css: '',
-      html: ''
-    }
-  }, route.meta.response);
-
-  if (res.headers.location) {
-    if (res.status === 200) {
-      res.status = 301;
-    }
-
-    return res;
+  if (res?.headers?.location) {
+    return {
+      status: res.status || 301,
+      headers: res.headers
+    };
   } else {
     const body = ServerApp.render({ router, route, ssrState });
     body.html += `<script>__SSR_STATE__ = ${serialize(ssrState)}</script>`;
 
-    res.body = {
-      ...body,
-      css: body.css.code
-    };
+    return {
+      status: res?.status || 200,
 
-    return res;
+      headers: {
+        'Content-Type': 'text/html',
+        ...res?.headers
+      },
+
+      body: template
+        .replace('</head>', body.head + '<style>' + body.css.code + '</style></head>')
+        .replace('<body>', '<body>' + body.html)
+    };
   }
+}
+
+function serialize(data: unknown) {
+  return JSON.stringify(data).replace(/</g, '\\u003C').replace(/>/g, '\\u003E');
 }
 ```
 
-`index.html`:
+`server.ts`
 
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <script type="module" src="/entry-client.ts"></script>
-    <!--ssr-head-->
-    <!--ssr-css-->
-  </head>
+```ts
+import http from 'http';
+import path from 'path';
+import serveStatic from 'serve-static';
+import render from './server-render';
+// @ts-expect-error handle by rollup-plugin-string
+import template from './index.html';
 
-  <body>
-    <!--ssr-html-->
-  </body>
-</html>
+const PORT = Number(process.env.PORT) || 3000;
+
+const serve = serveStatic(path.resolve(__dirname, '../client'));
+
+http.createServer(async(req, res) => {
+  const url = req.url as string;
+  console.log(url);
+
+  if (url.startsWith('/_assets/')) {
+    serve(req, res, () => {
+      res.statusCode = 404;
+      res.end('Not Found');
+    });
+  } else {
+    const { error, status, headers, body } = await render(
+      {
+        url,
+        template,
+
+        ctx: {
+          cookies: req.headers.cookie
+            ? Object.fromEntries(
+              new URLSearchParams(req.headers.cookie.replace(/;\s*/g, '&'))
+                // @ts-expect-error Property 'entries' does not exist on type 'URLSearchParams'.ts(2339)
+                .entries()
+            )
+            : {},
+
+          headers: req.headers
+        }
+      }
+    );
+
+    if (error) {
+      console.error(error);
+    }
+
+    res.writeHead(status, headers);
+    res.end(body);
+  }
+}).listen(PORT);
 ```
 
-Your server side code need to call the `render()` function, then inject the returned `head`, `css`, and `html` string into
-the `index.html` file.
-
-Svelte component should export a `load` function to fetch the data on server side.
+#### Fetch data on server side
+Svelte component can export a `load` function to fetch the data on server side.
 
 `load` function arguments:
 * `props`: `props` defined in the RouterView config.
@@ -224,25 +335,6 @@ the state object will be purged.
   <div>{data.content}</div>
   <Child foo={data.foo} {...childState} />
 {/if}
-```
-
-#### Client entry
-
-`entry-client.js`:
-
-```ts
-import { ClientApp } from 'svelte-pilot';
-import router from './router';
-
-new ClientApp({
-  target: document.body,
-  hydrate: true,
-
-  props: {
-    router,
-    ssrState: window.__SSR_STATE__
-  }
-});
 ```
 
 ## Constructor

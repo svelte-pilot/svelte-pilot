@@ -88,21 +88,17 @@ export default class Router {
             return this.runGuardHooks((this.current?._beforeLeaveHooks || []).concat(this.beforeChangeHooks, beforeEnterHooks), route, () => Promise.all(asyncComponentPromises).then(modules => this.runGuardHooks(modules.filter((m) => 'beforeEnter' in m).map(m => m.beforeEnter), route, () => {
                 this.updateRouteProps(route);
                 this.updateRouteKeys(route);
+                if (this.mode === 'client') {
+                    this.current = route;
+                }
                 this.emit('update', route);
                 this.emit('afterChange', route, this.current);
-                if (this.mode === 'server') {
-                    return Promise.all(loadFns.map(load => load(route, ssrContext))).then(() => ({
+                return this.mode === 'client'
+                    ? { route, ssrState: null }
+                    : Promise.all(loadFns.map(load => load(route, ssrContext))).then(() => ({
                         route,
                         ssrState
                     }));
-                }
-                else {
-                    this.current = route;
-                    return {
-                        route,
-                        ssrState: null
-                    };
-                }
             })));
         });
     }
