@@ -196,12 +196,12 @@ export default class Router {
       if (routerView instanceof Array) {
         this.flatRoutes(routerView, sideViews, stacks, result);
       } else if (routerView.path || routerView.children) {
-        stacks = [...stacks, sideViews.filter(v => v.name !== routerView.name).concat(routerView)];
+        const _stacks = [...stacks, sideViews.filter(v => v.name !== routerView.name).concat(routerView)];
 
         if (routerView.path) {
-          result[routerView.path] = stacks;
+          result[routerView.path] = _stacks;
         } else if (routerView.children) {
-          this.flatRoutes(routerView.children, sideViews, stacks, result);
+          this.flatRoutes(routerView.children, sideViews, _stacks, result);
         }
       }
     }
