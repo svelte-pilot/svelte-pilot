@@ -3,10 +3,8 @@ import UrlRouter from 'url-router';
 import { StringCaster } from 'cast-string';
 
 export type PrimitiveType = string | number | boolean | null | undefined;
-
-export type SerializableObject = {
-  [name: string]: PrimitiveType | SerializableObject[] | Record<string, SerializableObject>
-};
+export type SerializableValue = PrimitiveType | SerializableValue[] | { [key: string]: SerializableValue };
+export type SerializableObject = Record<string, SerializableValue>;
 
 export type ComponentModule = {
   default: typeof SvelteComponent,
