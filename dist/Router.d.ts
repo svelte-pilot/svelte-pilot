@@ -2,9 +2,7 @@ import { SvelteComponent } from 'svelte';
 import { StringCaster } from 'cast-string';
 export declare type PrimitiveType = string | number | boolean | null | undefined;
 export declare type SerializableObject = {
-    [name: string]: PrimitiveType | PrimitiveType[] | {
-        [name: string]: SerializableObject;
-    };
+    [name: string]: PrimitiveType | SerializableObject[] | Record<string, SerializableObject>;
 };
 export declare type ComponentModule = {
     default: typeof SvelteComponent;

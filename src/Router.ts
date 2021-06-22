@@ -5,7 +5,7 @@ import { StringCaster } from 'cast-string';
 export type PrimitiveType = string | number | boolean | null | undefined;
 
 export type SerializableObject = {
-  [name: string]: PrimitiveType | PrimitiveType[] | { [name: string]: SerializableObject }
+  [name: string]: PrimitiveType | SerializableObject[] | Record<string, SerializableObject>
 };
 
 export type ComponentModule = {
