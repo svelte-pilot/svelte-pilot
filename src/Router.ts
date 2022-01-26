@@ -120,7 +120,7 @@ function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
 }
 
 class HookInterrupt extends Error {
-  location?: string | Location
+  location?: string | Location;
 
   constructor(location?: string | Location) {
     super();
@@ -129,23 +129,23 @@ class HookInterrupt extends Error {
 }
 
 export default class Router {
-  private base?: string
+  private base?: string;
 
-  private pathQuery?: string
+  private pathQuery?: string;
 
-  private urlRouter: UrlRouter<RouterViewDefStacks>
+  private urlRouter: UrlRouter<RouterViewDefStacks>;
 
-  private beforeChangeHooks: GuardHook[] = []
+  private beforeChangeHooks: GuardHook[] = [];
 
-  private afterChangeHooks: NormalHook[] = []
+  private afterChangeHooks: NormalHook[] = [];
 
-  private updateHooks: UpdateHook[] = []
+  private updateHooks: UpdateHook[] = [];
 
-  private onPopStateWrapper: () => void
+  private onPopStateWrapper: () => void;
 
-  private mode?: Mode
+  private mode?: Mode;
 
-  current?: Route
+  current?: Route;
 
   constructor({
     routes,
