@@ -19,7 +19,7 @@ declare type SSRStateNode = {
     children?: SSRState;
 };
 export declare type SSRState = Record<string, SSRStateNode>;
-export declare type LoadFn = (props: Record<string, unknown>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+export declare type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: any) => Promise<SerializableObject>;
 export declare type KeyFn = (route: Route) => PrimitiveType;
 export declare type RouterViewDef = {
     name?: string;

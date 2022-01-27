@@ -24,8 +24,8 @@ type SSRStateNode = {
 
 export type SSRState = Record<string, SSRStateNode>;
 
-export type LoadFn =
-  (props: Record<string, unknown>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: any) => Promise<SerializableObject>;
 
 type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
 
