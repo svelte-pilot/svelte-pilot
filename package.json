@@ -24,7 +24,7 @@
     "url": "https://github.com/jiangfengming/svelte-pilot/issues"
   },
   "peerDependencies": {
-    "svelte": "^3.46.3"
+    "svelte": "^3.49.0"
   },
   "dependencies": {
     "cast-string": "^0.5.1",
@@ -32,14 +32,14 @@
     "url-router": "^13.0.0"
   },
   "devDependencies": {
-    "@types/lodash-es": "^4.17.5",
-    "@typescript-eslint/eslint-plugin": "^5.10.1",
-    "@typescript-eslint/parser": "^5.10.1",
-    "eslint": "^8.7.0",
+    "@types/lodash-es": "^4.17.6",
+    "@typescript-eslint/eslint-plugin": "^5.30.6",
+    "@typescript-eslint/parser": "^5.30.6",
+    "eslint": "^8.20.0",
     "eslint-config-enough": "^0.7.0",
     "eslint-plugin-ext": "^0.1.0",
-    "eslint-plugin-svelte3": "^3.4.0",
-    "svelte": "^3.46.3",
-    "typescript": "^4.5.5"
+    "eslint-plugin-svelte3": "^4.0.0",
+    "svelte": "^3.49.0",
+    "typescript": "^4.7.4"
   }
 }

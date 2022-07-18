@@ -867,7 +867,7 @@ Manually handle the route. Used in `server` mode. See [Server-Side Rendering](#s
 
 #### Params
 * location: [Locaton](#location-object) or path string.
-* ssrContext: `any`. I will be passed to the `load` function.
+* ssrContext: `any`. It will be passed to the `load` function.
 
 #### Returns
 An object contains:
