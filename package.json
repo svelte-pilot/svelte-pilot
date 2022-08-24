@@ -27,15 +27,15 @@
     "svelte": "^3.49.0"
   },
   "dependencies": {
-    "cast-string": "^0.5.1",
+    "cast-string": "^0.6.0",
     "lodash-es": "^4.17.21",
     "url-router": "^13.0.0"
   },
   "devDependencies": {
     "@types/lodash-es": "^4.17.6",
-    "@typescript-eslint/eslint-plugin": "^5.30.6",
-    "@typescript-eslint/parser": "^5.30.6",
-    "eslint": "^8.20.0",
+    "@typescript-eslint/eslint-plugin": "^5.34.0",
+    "@typescript-eslint/parser": "^5.34.0",
+    "eslint": "^8.22.0",
     "eslint-config-enough": "^0.7.0",
     "eslint-plugin-ext": "^0.1.0",
     "eslint-plugin-svelte3": "^4.0.0",
