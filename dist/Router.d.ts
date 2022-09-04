@@ -12,14 +12,14 @@ export declare type ComponentModule = {
 };
 export declare type SyncComponent = ComponentModule | typeof SvelteComponent;
 export declare type AsyncComponent = () => Promise<SyncComponent>;
-export declare type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
+export declare type RouteProps = Record<string, any> | ((route: Route) => Record<string, any>);
 export declare type PropSetters = Array<(route: Route) => SerializableObject>;
 declare type SSRStateNode = {
     data?: SerializableObject;
     children?: SSRState;
 };
 export declare type SSRState = Record<string, SSRStateNode>;
-export declare type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: any) => Promise<SerializableObject>;
+export declare type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<SerializableObject>;
 export declare type KeyFn = (route: Route) => PrimitiveType;
 export declare type RouterViewDef = {
     name?: string;

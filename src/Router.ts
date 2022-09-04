@@ -14,7 +14,8 @@ export type ComponentModule = {
 
 export type SyncComponent = ComponentModule | typeof SvelteComponent;
 export type AsyncComponent = () => Promise<SyncComponent>;
-export type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type RouteProps = Record<string, any> | ((route: Route) => Record<string, any>);
 export type PropSetters = Array<(route: Route) => SerializableObject>;
 
 type SSRStateNode = {
@@ -25,7 +26,7 @@ type SSRStateNode = {
 export type SSRState = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: any) => Promise<SerializableObject>;
+export type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<SerializableObject>;
 
 type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
 
