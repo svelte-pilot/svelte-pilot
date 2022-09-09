@@ -1,15 +1,7 @@
+import { create_ssr_component } from 'svelte/internal';
 import _ServerApp from './ServerApp.svelte';
 
-type ServerSideComponent = {
-  render: (props?: Record<string, unknown>) => {
-    html: string,
-    head: string,
-    css: {
-      code: string,
-      map: string
-    }
-  }
-};
+type ServerSideComponent = ReturnType<typeof create_ssr_component>;
 
 export * from './Router';
 export { default as Router } from './Router';
