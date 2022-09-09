@@ -6,7 +6,7 @@
   import type { default as Router, Route, SSRState } from './router';
 
   export let router: Router;
-  export let ssrState: SSRState | null;
+  export let ssrState: SSRState | null | undefined = null;
 
   const childrenStore = writable();
   const routeStore = writable();
