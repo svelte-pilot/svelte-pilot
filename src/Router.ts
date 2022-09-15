@@ -7,9 +7,9 @@ export type SerializableValue = PrimitiveType | SerializableValue[] | { [key: st
 export type SerializableObject = Record<string, SerializableValue>;
 
 export type ComponentModule = {
-  default: typeof SvelteComponent,
-  load?: LoadFn,
-  beforeEnter?: GuardHook
+  default: typeof SvelteComponent;
+  load?: LoadFn;
+  beforeEnter?: GuardHook;
 };
 
 export type SyncComponent = ComponentModule | typeof SvelteComponent;
@@ -19,8 +19,8 @@ export type RouteProps = Record<string, any> | ((route: Route) => Record<string,
 export type PropSetters = Array<(route: Route) => SerializableObject>;
 
 type SSRStateNode = {
-  data?: SerializableObject,
-  children?: SSRState
+  data?: SerializableObject;
+  children?: SSRState;
 };
 
 export type SSRState = Record<string, SSRStateNode>;
@@ -33,52 +33,52 @@ type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
 export type KeyFn = (route: Route) => PrimitiveType;
 
 export type RouterViewDef = {
-  name?: string,
-  path?: string,
-  component?: SyncComponent | AsyncComponent,
-  props?: RouteProps,
-  key?: KeyFn,
-  meta?: RouteProps,
-  children?: RouterViewDefGroup,
-  beforeEnter?: GuardHook,
-  beforeLeave?: GuardHook
+  name?: string;
+  path?: string;
+  component?: SyncComponent | AsyncComponent;
+  props?: RouteProps;
+  key?: KeyFn;
+  meta?: RouteProps;
+  children?: RouterViewDefGroup;
+  beforeEnter?: GuardHook;
+  beforeLeave?: GuardHook;
 };
 
 export type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
 type RouterViewDefStacks = RouterViewDef[][];
 
 export type RouterViewResolved = {
-  name: string,
-  component?: SyncComponent,
-  props?: SerializableObject,
-  key?: PrimitiveType,
-  children?: Record<string, RouterViewResolved>
+  name: string;
+  component?: SyncComponent;
+  props?: SerializableObject;
+  key?: PrimitiveType;
+  children?: Record<string, RouterViewResolved>;
 };
 
 export type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
 
 export type Location = {
-  path: string,
-  params?: Record<string, string | number | boolean>,
-  query?: Query,
-  hash?: string,
-  state?: SerializableObject
+  path: string;
+  params?: Record<string, string | number | boolean>;
+  query?: Query;
+  hash?: string;
+  state?: SerializableObject;
 };
 
 export type Route = {
-  path: string,
-  query: StringCaster,
-  search: string,
-  hash: string,
-  state: SerializableObject,
-  params: StringCaster,
-  meta: Record<string, unknown>,
-  href: string,
-  _routerViews: Record<string, RouterViewResolved>
-  _beforeLeaveHooks: GuardHook[],
-  _metaSetters: RouteProps[],
-  _propSetters: PropSetters,
-  _keySetters: KeyFn[]
+  path: string;
+  query: StringCaster;
+  search: string;
+  hash: string;
+  state: SerializableObject;
+  params: StringCaster;
+  meta: Record<string, unknown>;
+  href: string;
+  _routerViews: Record<string, RouterViewResolved>;
+  _beforeLeaveHooks: GuardHook[];
+  _metaSetters: RouteProps[];
+  _propSetters: PropSetters;
+  _keySetters: KeyFn[];
 };
 
 export type GuardHookResult = void | boolean | string | Location;
@@ -89,17 +89,17 @@ export type UpdateHook = (route: Route) => void;
 export type Events = 'beforeChange' | 'beforeCurrentRouteLeave' | 'update' | 'afterChange';
 
 export type EventHooks = {
-  beforeCurrentRouteLeave: GuardHook,
-  beforeChange: GuardHook,
-  update: UpdateHook,
-  afterChange: NormalHook
+  beforeCurrentRouteLeave: GuardHook;
+  beforeChange: GuardHook;
+  update: UpdateHook;
+  afterChange: NormalHook;
 };
 
 export type Mode = 'server' | 'client';
 
 export type HandlerResult = {
-  route: Route,
-  ssrState: SSRState | null
+  route: Route;
+  ssrState: SSRState | null;
 } | null;
 
 const detectedMode = typeof window === 'object' && window.history ? 'client' : 'server';
@@ -154,10 +154,10 @@ export default class Router {
     pathQuery,
     mode = detectedMode
   }: {
-    routes: RouterViewDefGroup,
-    base?: string,
-    pathQuery?: string,
-    mode?: Mode
+    routes: RouterViewDefGroup;
+    base?: string;
+    pathQuery?: string;
+    mode?: Mode;
   }) {
     this.urlRouter = new UrlRouter(this.flatRoutes(routes));
     this.base = base;
@@ -335,12 +335,12 @@ export default class Router {
   }
 
   parseLocation(location: string | Location): {
-    path: string,
-    query: StringCaster,
-    search: string,
-    hash: string,
-    state: SerializableObject,
-    href: string
+    path: string;
+    query: StringCaster;
+    search: string;
+    hash: string;
+    state: SerializableObject;
+    href: string;
   } {
     const url = this.locationToInternalURL(location);
 

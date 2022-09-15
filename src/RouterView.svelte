@@ -9,8 +9,8 @@
   export let name = 'default';
 
   type Node = {
-    routerViews?: RouterViewResolved['children'],
-    ssrState?: SSRState
+    routerViews?: RouterViewResolved['children'];
+    ssrState?: SSRState;
   };
 
   let view: RouterViewResolved | undefined;
