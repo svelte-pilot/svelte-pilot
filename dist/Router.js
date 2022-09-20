@@ -85,7 +85,7 @@ export default class Router {
                 _keySetters: keySetters
             };
             this.updateRouteMeta(route);
-            return this.runGuardHooks((this.current?._beforeLeaveHooks || []).concat(this.beforeChangeHooks, beforeEnterHooks), route, () => Promise.all(asyncComponentPromises).then(modules => this.runGuardHooks(modules.filter((m) => 'beforeEnter' in m).map(m => m.beforeEnter), route, () => {
+            return this.runGuardHooks((this.current?._beforeLeaveHooks || []).concat(this.beforeChangeHooks, beforeEnterHooks), route, ssrContext, () => Promise.all(asyncComponentPromises).then(modules => this.runGuardHooks(modules.filter((m) => 'beforeEnter' in m).map(m => m.beforeEnter), route, ssrContext, () => {
                 this.updateRouteProps(route);
                 this.updateRouteKeys(route);
                 if (this.mode === 'client') {
@@ -161,7 +161,7 @@ export default class Router {
     href(location) {
         return this.internalURLtoHref(this.locationToInternalURL(location));
     }
-    runGuardHooks(hooks, to, onFulfilled) {
+    runGuardHooks(hooks, to, ssrContext, onFulfilled) {
         let promise = Promise.resolve(null);
         for (const hook of hooks) {
             promise = promise.then(() => Promise.resolve(hook(to, this.current)).then(result => {
@@ -179,7 +179,7 @@ export default class Router {
         promise = promise.then(onFulfilled, e => {
             if (e instanceof HookInterrupt) {
                 if (e.location) {
-                    return this.handle(e.location);
+                    return this.handle(e.location, ssrContext);
                 }
                 else {
                     return null;

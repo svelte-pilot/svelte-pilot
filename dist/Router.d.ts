@@ -1,10 +1,6 @@
 import { SvelteComponent } from 'svelte';
 import { StringCaster } from 'cast-string';
 export declare type PrimitiveType = string | number | boolean | null | undefined;
-export declare type SerializableValue = PrimitiveType | SerializableValue[] | {
-    [key: string]: SerializableValue;
-};
-export declare type SerializableObject = Record<string, SerializableValue>;
 export declare type ComponentModule = {
     default: typeof SvelteComponent;
     load?: LoadFn;
@@ -13,13 +9,13 @@ export declare type ComponentModule = {
 export declare type SyncComponent = ComponentModule | typeof SvelteComponent;
 export declare type AsyncComponent = () => Promise<SyncComponent>;
 export declare type RouteProps = Record<string, any> | ((route: Route) => Record<string, any>);
-export declare type PropSetters = Array<(route: Route) => SerializableObject>;
+export declare type PropSetters = Array<(route: Route) => Record<string, unknown>>;
 declare type SSRStateNode = {
-    data?: SerializableObject;
+    data?: Record<string, unknown>;
     children?: SSRState;
 };
 export declare type SSRState = Record<string, SSRStateNode>;
-export declare type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<SerializableObject>;
+export declare type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<any>;
 export declare type KeyFn = (route: Route) => PrimitiveType;
 export declare type RouterViewDef = {
     name?: string;
@@ -36,7 +32,7 @@ export declare type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
 export declare type RouterViewResolved = {
     name: string;
     component?: SyncComponent;
-    props?: SerializableObject;
+    props?: Record<string, unknown>;
     key?: PrimitiveType;
     children?: Record<string, RouterViewResolved>;
 };
@@ -46,14 +42,14 @@ export declare type Location = {
     params?: Record<string, string | number | boolean>;
     query?: Query;
     hash?: string;
-    state?: SerializableObject;
+    state?: Record<string, unknown>;
 };
 export declare type Route = {
     path: string;
     query: StringCaster;
     search: string;
     hash: string;
-    state: SerializableObject;
+    state: Record<string, unknown>;
     params: StringCaster;
     meta: Record<string, unknown>;
     href: string;
@@ -104,7 +100,7 @@ export default class Router {
         query: StringCaster;
         search: string;
         hash: string;
-        state: SerializableObject;
+        state: Record<string, unknown>;
         href: string;
     };
     href(location: string | Location): string;
@@ -115,14 +111,14 @@ export default class Router {
     private updateRouteMeta;
     private updateRouteProps;
     private updateRouteKeys;
-    setState(state: SerializableObject): void;
+    setState(state: Record<string, unknown>): void;
     push(location: string | Location): void;
     replace(location: string | Location): void;
     private onPopState;
     private silentGo;
-    go(delta: number, state?: SerializableObject): void;
-    back(state?: SerializableObject): void;
-    forward(state?: SerializableObject): void;
+    go(delta: number, state?: Record<string, unknown>): void;
+    back(state?: Record<string, unknown>): void;
+    forward(state?: Record<string, unknown>): void;
     on(event: Events, handler: EventHooks[typeof event]): void;
     off(event: Events, handler: EventHooks[typeof event]): void;
     once(event: Events, handler: EventHooks[typeof event]): void;

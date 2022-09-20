@@ -3,8 +3,6 @@ import UrlRouter from 'url-router';
 import { StringCaster } from 'cast-string';
 
 export type PrimitiveType = string | number | boolean | null | undefined;
-export type SerializableValue = PrimitiveType | SerializableValue[] | { [key: string]: SerializableValue };
-export type SerializableObject = Record<string, SerializableValue>;
 
 export type ComponentModule = {
   default: typeof SvelteComponent;
@@ -16,17 +14,17 @@ export type SyncComponent = ComponentModule | typeof SvelteComponent;
 export type AsyncComponent = () => Promise<SyncComponent>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type RouteProps = Record<string, any> | ((route: Route) => Record<string, any>);
-export type PropSetters = Array<(route: Route) => SerializableObject>;
+export type PropSetters = Array<(route: Route) => Record<string, unknown>>;
 
 type SSRStateNode = {
-  data?: SerializableObject;
+  data?: Record<string, unknown>;
   children?: SSRState;
 };
 
 export type SSRState = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<SerializableObject>;
+export type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<any>;
 
 type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
 
@@ -50,7 +48,7 @@ type RouterViewDefStacks = RouterViewDef[][];
 export type RouterViewResolved = {
   name: string;
   component?: SyncComponent;
-  props?: SerializableObject;
+  props?: Record<string, unknown>;
   key?: PrimitiveType;
   children?: Record<string, RouterViewResolved>;
 };
@@ -62,7 +60,7 @@ export type Location = {
   params?: Record<string, string | number | boolean>;
   query?: Query;
   hash?: string;
-  state?: SerializableObject;
+  state?: Record<string, unknown>;
 };
 
 export type Route = {
@@ -70,7 +68,7 @@ export type Route = {
   query: StringCaster;
   search: string;
   hash: string;
-  state: SerializableObject;
+  state: Record<string, unknown>;
   params: StringCaster;
   meta: Record<string, unknown>;
   href: string;
@@ -245,11 +243,13 @@ export default class Router {
       return this.runGuardHooks(
         (this.current?._beforeLeaveHooks || []).concat(this.beforeChangeHooks, beforeEnterHooks),
         route,
+        ssrContext,
         () =>
           Promise.all(asyncComponentPromises).then(modules =>
             this.runGuardHooks(
               modules.filter((m): m is ComponentModule => 'beforeEnter' in m).map(m => <GuardHook>m.beforeEnter),
               route,
+              ssrContext,
               () => {
                 this.updateRouteProps(route);
                 this.updateRouteKeys(route);
@@ -339,7 +339,7 @@ export default class Router {
     query: StringCaster;
     search: string;
     hash: string;
-    state: SerializableObject;
+    state: Record<string, unknown>;
     href: string;
   } {
     const url = this.locationToInternalURL(location);
@@ -358,7 +358,12 @@ export default class Router {
     return this.internalURLtoHref(this.locationToInternalURL(location));
   }
 
-  private runGuardHooks(hooks: GuardHook[], to: Route, onFulfilled: () => HandlerResult | Promise<HandlerResult>) {
+  private runGuardHooks(
+    hooks: GuardHook[],
+    to: Route,
+    ssrContext: unknown,
+    onFulfilled: () => HandlerResult | Promise<HandlerResult>
+  ) {
     let promise: Promise<HandlerResult> = Promise.resolve(null);
 
     for (const hook of hooks) {
@@ -380,7 +385,7 @@ export default class Router {
       e => {
         if (e instanceof HookInterrupt) {
           if (e.location) {
-            return this.handle(e.location);
+            return this.handle(e.location, ssrContext);
           } else {
             return null;
           }
@@ -512,7 +517,7 @@ export default class Router {
         }
       }
 
-      function pushLoadFn(load: LoadFn, ssrState: SSRState) {
+      function pushLoadFn(load: LoadFn, ssrState: SSRStateNode) {
         loadFns.push(
           (route, ctx) => load(routerView.props || {}, route, ctx).then(data => ssrState.data = data)
         );
@@ -545,7 +550,7 @@ export default class Router {
   }
 
   private updateRouteMeta(route: Route) {
-    const meta: SerializableObject = route.meta = {};
+    const meta: Record<string, unknown> = route.meta = {};
     route._metaSetters.forEach(v => Object.assign(meta, v instanceof Function ? v(route) : v));
   }
 
@@ -557,7 +562,7 @@ export default class Router {
     route._keySetters.forEach(fn => fn(route));
   }
 
-  setState(state: SerializableObject): void {
+  setState(state: Record<string, unknown>): void {
     if (this.current) {
       Object.assign(this.current.state, state);
 
@@ -603,7 +608,7 @@ export default class Router {
     });
   }
 
-  private onPopState(state?: SerializableObject): void {
+  private onPopState(state?: Record<string, unknown>): void {
     this.handle({
       path: location.href,
       state: { ...history.state, ...state }
@@ -638,7 +643,7 @@ export default class Router {
     history.go(delta);
   }
 
-  go(delta: number, state?: SerializableObject): void {
+  go(delta: number, state?: Record<string, unknown>): void {
     if (state) {
       this.silentGo(delta, () => this.onPopState(state));
     } else {
@@ -646,11 +651,11 @@ export default class Router {
     }
   }
 
-  back(state?: SerializableObject): void {
+  back(state?: Record<string, unknown>): void {
     return this.go(-1, state);
   }
 
-  forward(state?: SerializableObject): void {
+  forward(state?: Record<string, unknown>): void {
     return this.go(1, state);
   }
 
