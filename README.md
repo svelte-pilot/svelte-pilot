@@ -1,70 +1,63 @@
 # svelte-pilot
-A svelte router with SSR (Server-Side Rendering) support.
+A Svelte router that supports Server-Side Rendering (SSR).
 
-- [svelte-pilot](#svelte-pilot)
-  - [Install](#install)
-  - [Usage](#usage)
-    - [Client-Side Rendering](#client-side-rendering)
-    - [Server-Side Rendering](#server-side-rendering)
-      - [Server entry](#server-entry)
-      - [Client entry](#client-entry)
-  - [Constructor](#constructor)
-    - [routes](#routes)
-      - [Simple routes](#simple-routes)
-      - [Dynamic import Svelte component](#dynamic-import-svelte-component)
-      - [Pass props to Svelte component](#pass-props-to-svelte-component)
-      - [Props from query string](#props-from-query-string)
-      - [Props from path params](#props-from-path-params)
-      - [Catch-all route](#catch-all-route)
-      - [Nested routes](#nested-routes)
-      - [Multiple `RouterView`s](#multiple-routerviews)
-      - [Override `RouterView`s](#override-routerviews)
-      - [Share meta data between `RouterView`s](#share-meta-data-between-routerviews)
-      - [Force re-rendering](#force-re-rendering)
-      - [`beforeEnter` guard hook](#beforeenter-guard-hook)
-        - [Params:](#params)
-        - [Returns:](#returns)
-      - [`beforeLeave` guard hook](#beforeleave-guard-hook)
-    - [base](#base)
-    - [pathQuery](#pathquery)
-    - [mode](#mode)
-  - [Route object](#route-object)
-    - [path](#path)
-    - [params](#params-1)
-    - [search](#search)
-    - [query](#query)
-    - [hash](#hash)
-    - [href](#href)
-    - [state](#state)
-    - [meta](#meta)
-  - [Location object](#location-object)
-    - [path](#path-1)
-    - [params](#params-2)
-    - [query](#query-1)
-    - [hash](#hash-1)
-    - [state](#state-1)
-  - [\<RouterLink>](#routerlink)
-    - [Props](#props)
-  - [Properties](#properties)
-    - [router.current](#routercurrent)
-  - [Methods](#methods)
-    - [router.handle()](#routerhandle)
-      - [Params](#params-3)
-      - [Returns](#returns-1)
-    - [router.parseLocation()](#routerparselocation)
-    - [router.href()](#routerhref)
-    - [router.push()](#routerpush)
-    - [router.replace()](#routerreplace)
-    - [router.setState()](#routersetstate)
-    - [router.go()](#routergo)
-    - [router.back()](#routerback)
-    - [router.forward()](#routerforward)
-    - [router.on()](#routeron)
-      - [Hooks running order](#hooks-running-order)
-    - [router.off()](#routeroff)
-    - [router.once()](#routeronce)
-  - [Get current route and router instance in components](#get-current-route-and-router-instance-in-components)
-  - [License](#license)
+- [Install](#install)
+- [Usage](#usage)
+  - [Client-Side Rendering](#client-side-rendering)
+  - [Server-Side Rendering](#server-side-rendering)
+- [Constructor](#constructor)
+  - [routes](#routes)
+    - [Simple Routes](#simple-routes)
+    - [Dynamic Import Svelte Component](#dynamic-import-svelte-component)
+    - [Pass Props to Svelte Component](#pass-props-to-svelte-component)
+    - [Props from Query String](#props-from-query-string)
+    - [Props from Path](#props-from-path)
+    - [Catch-all Route](#catch-all-route)
+    - [Nested Routes](#nested-routes)
+    - [Multiple `RouterView`s](#multiple-routerviews)
+    - [Override `RouterView`s](#override-routerviews)
+    - [Share Meta Data between `RouterView`s](#share-meta-data-between-routerviews)
+    - [Force Re-rendering](#force-re-rendering)
+    - [`beforeEnter` Guard Hook](#beforeenter-guard-hook)
+    - [`beforeLeave` Guard Hook](#beforeleave-guard-hook)
+  - [base](#base)
+  - [pathQuery](#pathquery)
+  - [mode](#mode)
+- [Route Object](#route-object)
+  - [path](#path)
+  - [params](#params-1)
+  - [search](#search)
+  - [query](#query)
+  - [hash](#hash)
+  - [href](#href)
+  - [state](#state)
+  - [meta](#meta)
+- [Location Object](#location-object)
+  - [path](#path-1)
+  - [params](#params-2)
+  - [query](#query-1)
+  - [hash](#hash-1)
+  - [state](#state-1)
+- [\<RouterLink\>](#routerlink)
+  - [Props](#props)
+- [Properties](#properties)
+  - [router.current](#routercurrent)
+- [Methods](#methods)
+  - [router.handle()](#routerhandle)
+  - [router.parseLocation()](#routerparselocation)
+  - [router.href()](#routerhref)
+  - [router.push()](#routerpush)
+  - [router.replace()](#routerreplace)
+  - [router.setState()](#routersetstate)
+  - [router.go()](#routergo)
+  - [router.back()](#routerback)
+  - [router.forward()](#routerforward)
+  - [router.on()](#routeron)
+    - [Order of Hook Execution](#order-of-hook-execution)
+  - [router.off()](#routeroff)
+  - [router.once()](#routeronce)
+- [Get the Current Route and Router Instance in Components](#get-the-current-route-and-router-instance-in-components)
+- [License](#license)
 
 ## Install
 ```
@@ -73,7 +66,7 @@ npm install svelte-pilot
 
 ## Usage
 
-Checkout [svelte-vite-ssr](https://github.com/jiangfengming/svelte-vite-ssr) template.
+Check out the [svelte-vite-ssr](https://github.com/jiangfengming/svelte-vite-ssr) template.
 
 ### Client-Side Rendering
 
@@ -81,7 +74,7 @@ Checkout [svelte-vite-ssr](https://github.com/jiangfengming/svelte-vite-ssr) tem
 import { Router, ClientApp } from 'svelte-pilot';
 
 const router = new Router({
-  // options
+  // routes definitions
 });
 
 new ClientApp({
@@ -94,196 +87,19 @@ new ClientApp({
 ```
 
 ### Server-Side Rendering
+Check out [server-render.ts](https://github.com/jiangfengming/svelte-vite-ssr/blob/main/src/server-render.ts).
 
-#### Client entry
+#### Fetch Data on the Server-Side
+A Svelte component can export a load function to fetch data on the server-side.
 
-`client.ts`:
-
-```ts
-import { ClientApp, SSRState } from 'svelte-pilot';
-import router from './router';
-
-declare global {
-  interface Window {
-    __SSR_STATE__: SSRState
-  }
-}
-
-// wait unitl async components loaded
-// prevent screen flash
-router.once('update', () =>
-  new ClientApp({
-    target: document.body,
-    hydrate: true,
-
-    props: {
-      router,
-      ssrState: window.__SSR_STATE__
-    }
-  })
-);
-```
-
-#### Server entry
-
-`server-render.ts`:
-
-```ts
-import { ServerApp } from 'svelte-pilot';
-import router from './router';
-
-type RenderParams = {
-  url: string,
-  ctx?: unknown,
-  template: string,
-};
-
-type RenderResult = {
-  error?: Error,
-  status: number,
-  headers?: Record<string, string>,
-  body?: string
-};
-
-export default async function(args: RenderParams): Promise<RenderResult> {
-  try {
-    return await render(args);
-  } catch (e) {
-    return {
-      error: e,
-      status: 500,
-
-      headers: {
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-store'
-      },
-
-      body: args.template // Fallback to CSR
-    };
-  }
-}
-
-async function render({ url, ctx, template }: RenderParams): Promise<RenderResult> {
-  const matchedRoute = await router.handle('http://127.0.0.1' + url, ctx);
-
-  if (!matchedRoute) {
-    console.error('No route found for url:', url);
-
-    if (new URL(url, 'http://127.0.0.1').pathname === '/') {
-      return {
-        status: 404,
-        body: 'Page Not Found',
-        headers: { 'content-type': 'text/plain' }
-      };
-    } else {
-      return {
-        status: 301,
-
-        headers: {
-          location: '/',
-          'Cache-Control': 'no-store'
-        }
-      };
-    }
-  }
-
-  const { route, ssrState } = matchedRoute;
-
-  const res = route.meta.response as { status?: number, headers?: Record<string, string> } | null;
-
-  if (res?.headers?.location) {
-    return {
-      status: res.status || 301,
-      headers: res.headers
-    };
-  } else {
-    const body = ServerApp.render({ router, route, ssrState });
-    body.html += `<script>__SSR_STATE__ = ${serialize(ssrState)}</script>`;
-
-    return {
-      status: res?.status || 200,
-
-      headers: {
-        'Content-Type': 'text/html',
-        ...res?.headers
-      },
-
-      body: template
-        .replace('</head>', body.head + '<style>' + body.css.code + '</style></head>')
-        .replace('<body>', '<body>' + body.html)
-    };
-  }
-}
-
-function serialize(data: unknown) {
-  return JSON.stringify(data).replace(/</g, '\\u003C').replace(/>/g, '\\u003E');
-}
-```
-
-`server.ts`
-
-```ts
-import http from 'http';
-import path from 'path';
-import serveStatic from 'serve-static';
-import render from './server-render';
-// @ts-expect-error handle by rollup-plugin-string
-import template from './index.html';
-
-const PORT = Number(process.env.PORT) || 3000;
-
-const serve = serveStatic(path.resolve(__dirname, '../client'));
-
-http.createServer(async(req, res) => {
-  const url = req.url as string;
-  console.log(url);
-
-  if (url.startsWith('/_assets/')) {
-    serve(req, res, () => {
-      res.statusCode = 404;
-      res.end('Not Found');
-    });
-  } else {
-    const { error, status, headers, body } = await render(
-      {
-        url,
-        template,
-
-        ctx: {
-          cookies: req.headers.cookie
-            ? Object.fromEntries(
-              new URLSearchParams(req.headers.cookie.replace(/;\s*/g, '&'))
-                // @ts-expect-error Property 'entries' does not exist on type 'URLSearchParams'.ts(2339)
-                .entries()
-            )
-            : {},
-
-          headers: req.headers
-        }
-      }
-    );
-
-    if (error) {
-      console.error(error);
-    }
-
-    res.writeHead(status, headers);
-    res.end(body);
-  }
-}).listen(PORT);
-```
-
-#### Fetch data on server side
-Svelte component can export a `load` function to fetch the data on server side.
-
-`load` function arguments:
-* `props`: `props` defined in the RouterView config.
+The `load` function takes the following arguments:
+* `props`: The `props` defined in the RouterView configuration.
 * `route`: The current [Route](#route-object) object.
-* `ssrContext`: anything you passed to `router.handle()`.
+* `ssrContext`: Anything passed to `router.handle()`.
 
-The returned state object will be passed to component props.
-On the client side, when a navigation is triggered through `history.pushState` / `history.replaceState` / `popstate` event,
-the state object will be purged.
+The returned state object is passed to the component props.
+When navigation is triggered on the client-side through the [router.push()](#routerpush) or
+[router.replace()](#routerreplace) methods, or the `popstate` event, the state object is purged.
 
 ```html
 <script context="module">
@@ -293,17 +109,8 @@ the state object will be purged.
     // Mock http request
     const ssrState = await fetchData(props.page, token: ssrCtx.cookies.token);
     
-    // load child component
+    // Load child component data
     const childState = await loadChild({ foo: ssrState.foo }, route, ssrCtx);
-
-    // Set response headers. Optional
-    route.meta.response = {
-      status: 200,
-
-      headers: {
-        'X-Foo': 'Bar'
-      }
-    };
 
     // Returned data will be passed to component props
     return {
@@ -324,7 +131,7 @@ the state object will be purged.
   $: onPageChange(page);
 
   async function onPageChange(page) {
-    // SSR state will be set to undefined when history.pushState / history.replaceState / popstate event is called.
+    // SSR state will be set to undefined when router.push() or router.replace() is called, or popstate event is fired.
     if (!ssrState) {
       data = await fetchData(page, getCookie('token'));
     }
@@ -351,56 +158,9 @@ const router = new Router({
 ```
 
 ### routes
-`RouterViewDefGroup`. Required. Define the routes.
+`RouterViewDefGroup`. Required. The route definitions.
 
-TypeScript definitions:
-
-```ts
-import { SvelteComponent } from 'svelte';
-
-type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
-
-type RouterViewDef = {
-  name?: string,
-  path?: string,
-  component?: SyncComponent | AsyncComponent,
-  props?: RouteProps,
-  key?: KeyFn,
-  meta?: RouteProps,
-  children?: RouterViewDefGroup,
-  beforeEnter?: GuardHook,
-  beforeLeave?: GuardHook
-};
-
-type SyncComponent = ComponentModule | typeof SvelteComponent;
-type AsyncComponent = () => Promise<SyncComponent>;
-type RouteProps = SerializableObject | ((route: Route) => SerializableObject);
-type KeyFn = (route: Route) => PrimitiveType;
-type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
-
-type ComponentModule = {
-  default: typeof SvelteComponent,
-  load?: LoadFn,
-  beforeEnter?: GuardHook
-};
-
-type LoadFn = (props: Record<string, any>, route: Route, ssrContext?: unknown) => Promise<SerializableObject>;
-type GuardHookResult = void | boolean | string | Location;
-
-type Location = {
-  path: string,
-  params?: Record<string, string | number | boolean>,
-  query?: Query,
-  hash?: string,
-  state?: SerializableObject
-};
-
-type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
-type PrimitiveType = string | number | boolean | null | undefined;
-type SerializableObject = { [name: string]: PrimitiveType | PrimitiveType[] | { [name: string]: SerializableObject } };
-```
-
-#### Simple routes
+#### Simple Routes
 
 ```ts
 import Foo from './views/Foo.svelte';
@@ -419,7 +179,7 @@ const routes = [
 ];
 ```
 
-#### Dynamic import Svelte component
+#### Dynamic Import Svelte Component
 
 ```ts
 const routes = [
@@ -430,7 +190,7 @@ const routes = [
 ];
 ```
 
-#### Pass props to Svelte component
+#### Pass Props to Svelte Component
   
 ```ts
 const routes = [
@@ -442,7 +202,7 @@ const routes = [
 ];
 ```
 
-#### Props from query string
+#### Props from Query String
 
 `props` can be a function that returns a plain object. Its parameter is a [Route](#route-object) object.
  
@@ -456,7 +216,7 @@ const routes = [
 ];
 ```
 
-#### Props from path params
+#### Props from Path
   
 ```ts
 const routes = [
@@ -476,7 +236,7 @@ const routes = [
 
 If regex is omitted, it defaults to `[^/]+`.
 
-#### Catch-all route
+#### Catch-all Route
 
 ```ts
 const routes = [
@@ -487,7 +247,7 @@ const routes = [
 ];
 ```
 
-#### Nested routes
+#### Nested Routes
 
 ```ts
 const routes = [
@@ -503,7 +263,7 @@ const routes = [
       {
         component: () => import('./views/LayoutA.svelte'),
 
-        // children alse can have children.
+        // children can also have children.
         // '/bar` page will be rendered as:
         // <Root>
         //   <LayoutA>
@@ -529,14 +289,14 @@ const routes = [
 import { RouterView } from 'svelte-pilot';
 </script>
 
-<nav>My beautiful navigation bar</nav>
+<nav>Navigation</nav>
 
 <main>
   <!-- Nested route component will be injected here -->
   <RouterView />
 </main>
 
-<footer>My footer</footer>
+<footer>Footer</footer>
 ```
 
 #### Multiple `RouterView`s
@@ -548,7 +308,7 @@ const routes = [
 
     children: [
       {
-        name: 'aside', // <---- pairs with <RouterView name="aside" />
+        name: 'aside', // <---- paired with <RouterView name="aside" />
         component: () => import('./views/Aside.svelte')
       },
 
@@ -595,8 +355,8 @@ const routes = [
         component: () => import('./views/Foo.svelte')
       },
 
-      // use array to group AsideB and Bar,
-      // then when rendering '/bar' page, AsideB will be used.
+      // Use array to group AsideB.svelte and Bar.svelte,
+      // then when rendering '/bar' page, AsideB.svelte will be used.
       [
         {
           name: 'aside',
@@ -613,7 +373,7 @@ const routes = [
 ]
 ```
 
-#### Share meta data between `RouterView`s
+#### Share Meta Data between `RouterView`s
 
 ```ts
 const routes = [
@@ -640,14 +400,15 @@ const routes = [
 ]
 ```
 
-`meta` can be a plain object, or a function that receives a [Route](#route-object) object as argument and returns a plain object.
+`meta` can be a plain object, or a function that receives a [Route](#route-object) object as argument and returns a
+plain object.
 
 All meta objects will be merged together.
 If objects have a property with the same name, the nested RouterView's meta property will overwrite the outer ones.
 
-#### Force re-rendering
-By default, when component is the same when route changes, the component will not re-rendered.
-You can force it to re-render by setting a `key` generator:
+#### Force Re-rendering
+By default, when component is the same when route changes, the component will not be re-rendered.
+You can force it to re-render by setting a `key` generator.
 
 ```ts
 const routes = [
@@ -659,7 +420,7 @@ const routes = [
 ];
 ```
 
-#### `beforeEnter` guard hook
+#### `beforeEnter` Guard Hook
 
 ```ts
 const routes = [
@@ -673,19 +434,18 @@ const routes = [
 ];
 ```
 
-When the navigation is triggered,
-the `beforeEnter` hook functions in the incoming RouterView configs will be triggered.
-
+The `beforeEnter` hook is used to define a function that will be executed before a route transition occurs. When the
+navigation is triggered, the `beforeEnter` hook function in the incoming RouterView configurations will be triggered.
 ##### Params:
-* `to`: The [Route](#route-object) object will be changed to.
+* `to`: The [Route](#route-object) object that will be changed to.
 * `from`: The current [Route](#route-object) object.
 
 ##### Returns:
-* `undefined` or `true`: Allow the navigation.
-* `false`: Abort the navigation and rollback.
-* path string or [Location](#location-object) object: redirect to it.
+* `undefined` or `true`: Allow the navigation to proceed.
+* `false`: Abort the navigation and rollback to the previous route.
+* A path string or [Location](#location-object) object: Redirect to the specified `path` or `location`.
 
-#### `beforeLeave` guard hook
+#### `beforeLeave` Guard Hook
 
 ```ts
 const routes = [
@@ -699,19 +459,22 @@ const routes = [
 ]
 ```
 
-When the route is going to be changed,
-the `beforeLeave` hook functions in the current RouterView configs will be triggered.
+the `beforeLeave` hook is used to define a function that will be executed before a route transition occurs. When the
+route is going to be changed, the `beforeLeave` hook function in the current RouterView configurations will be
+triggered.
 
-The params and return value is the same as `beforeEnter` hook.
+The parameters and return value for the `beforeLeave` hook are the same as the `beforeEnter` hook.
 
 ### base
-`string`. Optional. The base path of the app.
-If your application is serving under `https://www.example.com/app/`, then the `base` is `/app/`.
-If you want the root path not end with slash, you can set the base without ending slash, like `/app`.
-Defaults to `/`.
+`string`. Optional. The base path of the app. Defaults to `/`.
 
-Note, when using `router.push()`, `router.replace()` and `router.handle()`, Only if you pass an absolute URL (starting with protocol),
-The base part will be trimmed when matching the route.
+If your application is hosted in a subdirectory of your domain, such as `https://www.example.com/app/`. In this case,
+the base path would be `/app/`. If you want the root path to not end with a slash, you can set the base without the
+ending slash, like `/app`.
+
+Note that when using `router.push()`, `router.replace()`, or `router.handle()`, If you pass an absolute URL starting
+with a protocol (e.g. `https://www.example.com/app/my-route`), the base part of the URL will be trimmed when matching
+the route.
 
 ```js
 const router = new Router({
@@ -728,28 +491,30 @@ const router = new Router({
 // works
 router.handle('http://127.0.0.1/app/bar');
 
+// works
+router.handle('/bar');
+
 // won't work
 router.handler('/app/bar');
 ```
 
 ### pathQuery
-`string`. Optional. Uses the query name as router path.
-It is useful when serving the application under `file:` protocol.
+`string`. Optional. Uses the query name as the router path. This can be useful when serving the application under the
+`file:` protocol.
 
 e.g.
 ```ts
+// file:///path/to/index.html?__path__=/home
 const router = new Router({
   pathQuery: '__path__'
 });
 ```
 
-`file:///path/to/index.html?__path__=/home` will route to `/home`.
-
 ### mode
 `'server'` | `'client'`. Optional. Defines the running mode.
-If not set, it will auto detect by `typeof window === 'object' ? 'client' : 'server'`.
+If not set, it will auto detect by `typeof window !== 'undefined' && window === globalThis ? 'client' : 'server'`.
 
-## Route object
+## Route Object
 A route object contains these information of the matched route:
 
 ```ts
@@ -766,31 +531,34 @@ A route object contains these information of the matched route:
 ```
 
 ### path
-`string`. A string containing an initial `'/'` followed by the path of the URL not including the query string or fragment.
+`string`. A string that starts with `/` and is followed by the path of the URL, but does not include the query string
+or hash.
 
 ### params
-`StringCaster`. A [StringCaster](https://github.com/jiangfengming/cast-string#stringcaster) object that wraps the path params.
+`StringCaster`. A [StringCaster](https://github.com/jiangfengming/cast-string#stringcaster) object that wraps the path
+parameters.
 
 ### search
-`string`. A string containing a `'?'` followed by the parameters of the URL.
+`string`. A string that starts with `?` and is followed by the query string of the URL.
 
 ### query
-`StringCaster`. A [StringCaster](https://github.com/jiangfengming/cast-string#stringcaster) object that wraps the `URLSearchParams` object.
+`StringCaster`. A [StringCaster](https://github.com/jiangfengming/cast-string#stringcaster) object that wraps the
+`URLSearchParams` object.
 
 ### hash
-`string`. A string containing a `'#'` followed by the fragment identifier of the URL.
+`string`. A string that starts with `#` and is followed by the fragment identifier of the URL.
 
 ### href
 `string`. The relative URL of the route.
 
 ### state
-`object`. [history.state](https://developer.mozilla.org/en-US/docs/Web/API/History/state).
+`object`. [history.state](https://developer.mozilla.org/en-US/docs/Web/API/History/state) object.
 ### meta
-`object`. A plain object used to share information between RouterView configs.
+`object`. A plain object that is used to share information between RouterView configurations.
 
 
-## Location object
-A Location object is used to describe the destination of a navigation. It is made up by the following properties:
+## Location Object
+A Location object is used to describe the destination of a navigation. It is made up of the following properties:
 
 ```ts
 {
@@ -803,20 +571,20 @@ A Location object is used to describe the destination of a navigation. It is mad
 ```
 
 ### path
-`string`. A string containing an initial `'/'` followed by the path of the URL.
-It can include query string and hash but not recommended, because you need to handle non-ASCII chars manually.
+`string`. A string that starts with `/` and is followed by the path of the URL. It can include the query string and
+hash, but it is not recommended because it requires manual handling of non-ASCII characters.
 
 ### params
-`object`. A key-value object to fill into the param placeholder of `path`.
-For example,  `{ path: '/articles/:id', params: { id: 123 } }` is equal to `{ path: '/articles/123 }`.
-It is safer to use params instead of concatting strings by hand,
-because `encodeURIComponent()` is applied on the param value for you.
+`object`. A key-value object used to fill in the parameter placeholders of the `path`. For example,
+`{ path: '/articles/:id', params: { id: 123 } }` is equal to `{ path: '/articles/123 }`. It is safer to use `params`
+instead of concatenating strings manually, because `encodeURIComponent()` is automatically applied to the parameter
+values.
 
 ### query
 `object` | `URLSearchParams`.
-If a plain object is provided,
-its format is the same as the return value of the [querystring](https://nodejs.org/api/querystring.html)
-module's [parse()](https://nodejs.org/api/querystring.html#querystring_querystring_parse_str_sep_eq_options) method:
+If a plain object is provided, its format is the same as the return value of the
+[querystring](https://nodejs.org/api/querystring.html) module's
+[parse()](https://nodejs.org/api/querystring.html#querystring_querystring_parse_str_sep_eq_options) method:
 
 ```ts
 {
@@ -826,30 +594,30 @@ module's [parse()](https://nodejs.org/api/querystring.html#querystring_querystri
 ```
 
 ### hash
-`string`. A string containing a `'#'` followed by the fragment identifier of the URL.
+`string`. A string that starts with `#` and is followed by the fragment identifier of the URL.
 
 ### state
-`object`. The state object of the location.
+`object`. The state object associated with the location.
 
 ## \<RouterLink>
-A navigation component. It renders an `<a>` element.
+`<RouterLink>` is a navigation component that renders an `<a>` element.
 
 ```html
 <script>
   import { RouterLink } from 'svelte-pilot';
 </script>
 
-<RouterLink to={loaction} replace={true} style="color: red;" class="cls-name">Link</RouterLink>
+<RouterLink to={loaction} replace={true}>Link</RouterLink>
 ```
 
 ### Props
-* `to`: [Location](#location-object) | `string`.
+* `to`: [Location](#location-object) | `string`. The destination location of the link.
 * `replace`: `Boolean`. Defaults to `false`. If true, the navigation will be handled by `history.replaceState()`.
-* `style`: `string`. Set the `style` attribute of `<a>` tag.
-* `class`: `string`. Set the `class` attribute of `<a>` tag.
+  
+Other props will be passed to the `<a>` element as is.
  
-`<RouterLink>` always has `router-link` class.
-If the location equals to the current route's path, `router-link-active` class will be on.
+The `<RouterLink>` component always has the `router-link` class. If the `to` location matches the current route's path,
+the `router-link-active` class is added to the component.
 
 ## Properties
 
@@ -863,14 +631,14 @@ The current [Route](#route-object). It is only available in `client` mode.
 router.handle(location, ssrContext)
 ```
 
-Manually handle the route. Used in `server` mode. See [Server-Side Rendering](#server-side-rendering) for usage.
+Manually handles the route. Used in `server` mode. See [Server-Side Rendering](#server-side-rendering) for usage.
 
 #### Params
-* location: [Locaton](#location-object) or path string.
+* location: [Locaton](#location-object) object or path string.
 * ssrContext: `any`. It will be passed to the `load` function.
 
 #### Returns
-An object contains:
+An object containing:
 
 ```ts
 {
@@ -880,7 +648,7 @@ An object contains:
 ```
 
 * `route`: [Route](#route-object) object.
-* `ssrState`: A serializable object. It is used to inject into the html for hydration by the client side.
+* `ssrState`: A serializable object. It is used to inject into the html for hydration by the client-side.
 
 ### router.parseLocation()
 
@@ -888,7 +656,7 @@ An object contains:
 router.parseLocation(location: Location | string)
 ```
 
-Parse the [Location](#location-object) object or path string, and return a subset of [Route](#route-object) object:
+Parse the [Location](#location-object) object or path string, and returns a subset of [Route](#route-object) object:
 
 ```ts
 {
@@ -907,7 +675,8 @@ Parse the [Location](#location-object) object or path string, and return a subse
 router.href(location: Location | string)
 ```
 
-Returns the href of [Location](#location-object) object of path string. It can be used as `href` attribute of `<a>` tag.
+Returns the href of [Location](#location-object) object or path string. It can be used as the `href` attribute of an
+`<a>` tag.
 
 ### router.push()
 
@@ -915,7 +684,7 @@ Returns the href of [Location](#location-object) object of path string. It can b
 router.push(location: Location | string)
 ```
 
-Change the route by calling `history.pushState()`.
+Changes the route by calling `history.pushState()`.
 
 ### router.replace()
 
@@ -923,7 +692,7 @@ Change the route by calling `history.pushState()`.
 router.replace(location: Location | string)
 ```
 
-Replace the current route by calling `history.replaceState()`.
+Replaces the current route by calling `history.replaceState()`.
 
 ### router.setState()
 
@@ -931,7 +700,7 @@ Replace the current route by calling `history.replaceState()`.
 router.setState(state)
 ```
 
-Merge the state into the current route's state.
+Merges the state into the current route's state.
 
 ### router.go()
 
@@ -940,7 +709,7 @@ router.go(position, state)
 ```
 
 Works like `history.go()`, but has an additional `state` parameter.
-If `State` is set, It will be merged into the state object of the destination location.
+If `State` is set, it will be merged into the state object of the destination location.
 
 ### router.back()
 
@@ -960,7 +729,7 @@ Alias of `router.go(1, state)`
 
 
 ### router.on()
-Add a hook function that will be called when the specified event fires.
+Adds a hook function that will be called when the specified event fires.
 
 ```ts
 router.on('beforeChange', hook: GuardHook)
@@ -976,16 +745,16 @@ type UpdateHook = (route: Route) => void;
 type NormalHook = (to: Route, from?: Route) => void;
 ```
 
-#### Hooks running order
-1. Navigation triggered.
-2. Call `beforeLeave` hooks in the outgoing `RouterView` configs.
-3. Call `beforeCurrentRouteLeave` hooks registered via `router.on('beforeCurrentRouteLeave', hook)`.
-4. Call `beforeChange` hooks registered via `router.on('beforeChange', hook)`.
-5. Call `beforeEnter` hooks in the incoming `RouterView` configs and
-   `beforeEnter` hooks exported from context module (`<script context="module">`) of aync Svelte component.
-6. Call `beforeEnter` hooks exported from context module of async Svelte component.
-7. Call `update` hooks registered via `router.on('update', hook)`.
-8. Call `afterChange` hooks registered via `router.on('afterChange', hook)`.
+#### Order of Hook Execution
+1. Navigation is triggered.
+2. `beforeLeave` hooks in the outgoing `RouterView` configurations are called.
+3. `beforeCurrentRouteLeave` hooks registered via `router.on('beforeCurrentRouteLeave', hook)` are called.
+4. `beforeChange` hooks registered via `router.on('beforeChange', hook)` are called.
+5. `beforeEnter` hooks in the incoming `RouterView` configurations and `beforeEnter` hooks exported from the context
+    module (`<script context="module">`) of an aync Svelte component are called.
+6. `beforeEnter` hooks exported from the context module of an async Svelte component are called.
+7. `update` hooks registered via `router.on('update', hook)` are called.
+8. `afterChange` hooks registered via `router.on('afterChange', hook)` are called.
 
 ### router.off()
 
@@ -997,9 +766,9 @@ Removes the specified event hook.
 
 ### router.once()
 
-Run a hook function once.
+Runs a hook function once.
 
-## Get current route and router instance in components
+## Get the Current Route and Router Instance in Components
 
 ```html
 <script>
@@ -1014,4 +783,4 @@ Run a hook function once.
 ```
 
 ## License
-[MIT](LICENSE)
+This project is licensed under the [MIT](LICENSE) License.

@@ -100,7 +100,7 @@ export type HandlerResult = {
   ssrState: SSRState | null;
 } | null;
 
-const detectedMode = typeof window === 'object' && window.history ? 'client' : 'server';
+const detectedMode = typeof window !== 'undefined' && window === globalThis ? 'client' : 'server';
 
 function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
   if (q instanceof URLSearchParams) {

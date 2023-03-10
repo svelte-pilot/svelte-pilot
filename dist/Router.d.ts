@@ -1,23 +1,23 @@
 import { SvelteComponent } from 'svelte';
 import { StringCaster } from 'cast-string';
-export declare type PrimitiveType = string | number | boolean | null | undefined;
-export declare type ComponentModule = {
+export type PrimitiveType = string | number | boolean | null | undefined;
+export type ComponentModule = {
     default: typeof SvelteComponent;
     load?: LoadFn;
     beforeEnter?: GuardHook;
 };
-export declare type SyncComponent = ComponentModule | typeof SvelteComponent;
-export declare type AsyncComponent = () => Promise<SyncComponent>;
-export declare type RouteProps = Record<string, any> | ((route: Route) => Record<string, any>);
-export declare type PropSetters = Array<(route: Route) => Record<string, unknown>>;
-declare type SSRStateNode = {
+export type SyncComponent = ComponentModule | typeof SvelteComponent;
+export type AsyncComponent = () => Promise<SyncComponent>;
+export type RouteProps = Record<string, any> | ((route: Route) => Record<string, any>);
+export type PropSetters = Array<(route: Route) => Record<string, unknown>>;
+type SSRStateNode = {
     data?: Record<string, unknown>;
     children?: SSRState;
 };
-export declare type SSRState = Record<string, SSRStateNode>;
-export declare type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<any>;
-export declare type KeyFn = (route: Route) => PrimitiveType;
-export declare type RouterViewDef = {
+export type SSRState = Record<string, SSRStateNode>;
+export type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<any>;
+export type KeyFn = (route: Route) => PrimitiveType;
+export type RouterViewDef = {
     name?: string;
     path?: string;
     component?: SyncComponent | AsyncComponent;
@@ -28,23 +28,23 @@ export declare type RouterViewDef = {
     beforeEnter?: GuardHook;
     beforeLeave?: GuardHook;
 };
-export declare type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
-export declare type RouterViewResolved = {
+export type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
+export type RouterViewResolved = {
     name: string;
     component?: SyncComponent;
     props?: Record<string, unknown>;
     key?: PrimitiveType;
     children?: Record<string, RouterViewResolved>;
 };
-export declare type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
-export declare type Location = {
+export type Query = Record<string, PrimitiveType | PrimitiveType[]> | URLSearchParams;
+export type Location = {
     path: string;
     params?: Record<string, string | number | boolean>;
     query?: Query;
     hash?: string;
     state?: Record<string, unknown>;
 };
-export declare type Route = {
+export type Route = {
     path: string;
     query: StringCaster;
     search: string;
@@ -59,19 +59,19 @@ export declare type Route = {
     _propSetters: PropSetters;
     _keySetters: KeyFn[];
 };
-export declare type GuardHookResult = void | boolean | string | Location;
-export declare type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
-export declare type NormalHook = (to: Route, from?: Route) => void;
-export declare type UpdateHook = (route: Route) => void;
-export declare type Events = 'beforeChange' | 'beforeCurrentRouteLeave' | 'update' | 'afterChange';
-export declare type EventHooks = {
+export type GuardHookResult = void | boolean | string | Location;
+export type GuardHook = (to: Route, from?: Route) => GuardHookResult | Promise<GuardHookResult>;
+export type NormalHook = (to: Route, from?: Route) => void;
+export type UpdateHook = (route: Route) => void;
+export type Events = 'beforeChange' | 'beforeCurrentRouteLeave' | 'update' | 'afterChange';
+export type EventHooks = {
     beforeCurrentRouteLeave: GuardHook;
     beforeChange: GuardHook;
     update: UpdateHook;
     afterChange: NormalHook;
 };
-export declare type Mode = 'server' | 'client';
-export declare type HandlerResult = {
+export type Mode = 'server' | 'client';
+export type HandlerResult = {
     route: Route;
     ssrState: SSRState | null;
 } | null;

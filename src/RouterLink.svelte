@@ -8,7 +8,6 @@
   let className = '';
 
   export { className as class };
-  export let style = '';
   export let to: string | Location;
   export let replace = false;
 
@@ -37,11 +36,11 @@
 
 <a
   href={loc.href}
-  on:click={onClick}
   class="router-link {className}"
   class:router-link-active={active}
-  {style}
   on:click
+  on:click={onClick}
+  {...$$restProps}
 >
   <slot />
 </a>
