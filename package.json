@@ -7,7 +7,7 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "rm dist/* && tsc && cp src/*.svelte dist"
+    "build": "rm -rf dist && tsc && cp src/*.svelte dist"
   },
   "repository": {
     "type": "git",
