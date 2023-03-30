@@ -129,33 +129,27 @@ class HookInterrupt extends Error {
 
 export default class Router {
   private base?: string;
-
   private pathQuery?: string;
-
   private urlRouter: UrlRouter<RouterViewDefStacks>;
-
   private beforeChangeHooks: GuardHook[] = [];
-
   private afterChangeHooks: NormalHook[] = [];
-
   private updateHooks: UpdateHook[] = [];
-
   private onPopStateWrapper: () => void;
-
   private mode?: Mode;
-
   current?: Route;
 
   constructor({
     routes,
     base,
     pathQuery,
-    mode = detectedMode
+    mode = detectedMode,
+    navigateOnStartup = true
   }: {
     routes: RouterViewDefGroup;
     base?: string;
     pathQuery?: string;
-    mode?: Mode;
+    mode: Mode;
+    navigateOnStartup: boolean;
   }) {
     this.urlRouter = new UrlRouter(this.flatRoutes(routes));
     this.base = base;
@@ -170,10 +164,12 @@ export default class Router {
         history.replaceState({ __position__: history.length }, '');
       }
 
-      this.replace({
-        path: location.href,
-        state: history.state
-      });
+      if (navigateOnStartup) {
+        this.replace({
+          path: location.href,
+          state: history.state
+        });
+      }
     }
   }
 

@@ -514,6 +514,9 @@ const router = new Router({
 `'server'` | `'client'`. Optional. Defines the running mode.
 If not set, it will auto detect by `typeof window !== 'undefined' && window === globalThis ? 'client' : 'server'`.
 
+### navigateOnStartup
+`boolean`. Optional. Whether to trigger the navigation when the router is initialized. Defaults to `true`.
+
 ## Route Object
 A route object contains these information of the matched route:
 
