@@ -249,13 +249,10 @@ export default class Router {
               () => {
                 this.updateRouteProps(route);
                 this.updateRouteKeys(route);
-
-                if (this.mode === 'client') {
-                  this.current = route;
-                }
-
+                const from = this.current;
+                this.current = route;
                 this.emit('update', route);
-                this.emit('afterChange', route, this.current);
+                this.emit('afterChange', route, from);
 
                 return this.mode === 'client'
                   ? { route, ssrState: null }
