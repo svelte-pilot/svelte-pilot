@@ -1,6 +1,6 @@
 {
   "name": "svelte-pilot",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "description": "A Svelte router that supports Server-Side Rendering (SSR).",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
