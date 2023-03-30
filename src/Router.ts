@@ -24,7 +24,8 @@ type SSRStateNode = {
 export type SSRState = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type LoadFn = (props: any, route: Route, ssrContext?: any) => Promise<any>;
+export type LoadFn<Props = any, Ctx = any, Ret = any> =
+  (props: Props, route: Route, ssrContext?: Ctx) => Ret | Promise<Ret>;
 
 type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
 
@@ -512,7 +513,7 @@ export default class Router {
 
       function pushLoadFn(load: LoadFn, ssrState: SSRStateNode) {
         loadFns.push(
-          (route, ctx) => load(routerView.props || {}, route, ctx).then(data => ssrState.data = data)
+          (route, ctx) => Promise.resolve(load(routerView.props || {}, route, ctx)).then(data => ssrState.data = data)
         );
       }
 
