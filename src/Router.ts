@@ -148,8 +148,8 @@ export default class Router {
     routes: RouterViewDefGroup;
     base?: string;
     pathQuery?: string;
-    mode: Mode;
-    navigateOnStartup: boolean;
+    mode?: Mode;
+    navigateOnStartup?: boolean;
   }) {
     this.urlRouter = new UrlRouter(this.flatRoutes(routes));
     this.base = base;
