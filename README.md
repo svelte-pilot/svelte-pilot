@@ -552,7 +552,10 @@ parameters.
 `string`. A string that starts with `#` and is followed by the fragment identifier of the URL.
 
 ### href
-`string`. The relative URL of the route.
+`string`. The relative URL of the route. It can be used as the `href` attribute of an `<a>` tag.
+
+Note that it is not a complete URL. If your router is `pathQuery` based, it will contain the search and hash.
+Otherwise, it will contain the pathname, search, and hash.
 
 ### state
 `object`. [history.state](https://developer.mozilla.org/en-US/docs/Web/API/History/state) object.
@@ -680,6 +683,9 @@ router.href(location: Location | string)
 
 Returns the href of [Location](#location-object) object or path string. It can be used as the `href` attribute of an
 `<a>` tag.
+
+Note that it is not a complete URL. If your router is `pathQuery` based, it will contain the search and hash.
+Otherwise, it will contain the pathname, search, and hash.
 
 ### router.push()
 

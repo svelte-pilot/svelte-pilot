@@ -183,7 +183,7 @@ export default class Router {
     const sideViewsInArray = routerViews.filter((v): v is RouterViewDef => !Array.isArray(v) && !v.path);
     const sideViewNames = sideViewsInArray.map(v => v.name);
 
-    // Router views in the same array have higher priority than outer ones.
+    // Router views in the same array have a higher priority than outer ones.
     sideViews = sideViews.filter(v => !sideViewNames.includes(v.name)).concat(sideViewsInArray);
 
     for (const routerView of routerViews) {
@@ -290,8 +290,8 @@ export default class Router {
       url.hash = location.hash;
     }
 
-    // `base` and `pathQuery` only has effect on absolute URL.
-    // `base` and `pathQuery` are mutually exclusive.
+    // `base` and `pathQuery` only have an effect on absolute URLs.
+    // Additionally, `base` and `pathQuery` are mutually exclusive.
     if (/^\w+:/.test(location.path)) {
       if (this.base && url.pathname.startsWith(this.base)) {
         url.pathname = url.pathname.slice(this.base.length);
@@ -305,8 +305,7 @@ export default class Router {
     return url;
   }
 
-  // If `base` is not ends with '/', and path is root ('/'), the ending slash will be trimmed.
-  private internalURLtoHref(url: URL) {
+  private convertInternalUrlToHref(url: URL) {
     if (this.pathQuery) {
       const u = new URL(url.href);
 
@@ -316,6 +315,7 @@ export default class Router {
 
       return u.search + u.hash;
     } else {
+      // If `base` does not end with '/', and the path is the root ('/'), the ending slash will be trimmed.
       return (
         this.base
           ? this.base.endsWith('/')
@@ -344,12 +344,12 @@ export default class Router {
       search: url.search,
       hash: url.hash,
       state: typeof location === 'string' || !location.state ? {} : location.state,
-      href: this.internalURLtoHref(url)
+      href: this.convertInternalUrlToHref(url)
     };
   }
 
   href(location: string | Location): string {
-    return this.internalURLtoHref(this.locationToInternalURL(location));
+    return this.convertInternalUrlToHref(this.locationToInternalURL(location));
   }
 
   private runGuardHooks(
