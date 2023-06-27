@@ -5,12 +5,14 @@ import { StringCaster } from 'cast-string';
 export type PrimitiveType = string | number | boolean | null | undefined;
 
 export type ComponentModule = {
-  default: typeof SvelteComponent;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  default: typeof SvelteComponent<any>;
   load?: LoadFn;
   beforeEnter?: GuardHook;
 };
 
-export type SyncComponent = ComponentModule | typeof SvelteComponent;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type SyncComponent = ComponentModule | typeof SvelteComponent<any>;
 export type AsyncComponent = () => Promise<SyncComponent>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type RouteProps = Record<string, any> | ((route: Route) => Record<string, any>);
