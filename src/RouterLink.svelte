@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
-  import type { Writable } from 'svelte/store';
-  import isEqual from 'lodash-es/isEqual';
-  import { CTX_ROUTER, CTX_ROUTE } from './ctxKeys';
-  import type { default as Router, Route, Location } from './Router';
+  import isEqual from "lodash-es/isEqual";
+  import { getContext } from "svelte";
+  import { Writable } from "svelte/store";
+  import { Location, Route, default as Router } from "./Router";
+  import { CTX_ROUTE, CTX_ROUTER } from "./ctxKeys";
 
-  let className = '';
+  let className = "";
 
   export { className as class };
   export let to: string | Location;
@@ -21,8 +21,12 @@
     e.preventDefault();
     const current = $route;
 
-    const isSameLoc = loc.href === current.href &&
-      isEqual({ ...loc.state, __position__: null }, { ...current.state, __position__: null });
+    const isSameLoc =
+      loc.href === current.href &&
+      isEqual(
+        { ...loc.state, __position__: null },
+        { ...current.state, __position__: null }
+      );
 
     if (!isSameLoc) {
       if (replace) {

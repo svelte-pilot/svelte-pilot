@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { setContext } from 'svelte';
-  import { writable } from 'svelte/store';
-  import { CTX_CHILDREN, CTX_ROUTER, CTX_ROUTE } from './ctxKeys';
-  import RouterView from './RouterView.svelte';
-  import type { default as Router, Route, SSRState } from './Router';
+  import { setContext } from "svelte";
+  import { writable } from "svelte/store";
+  import { Route, default as Router, SSRState } from "./Router";
+  import RouterView from "./RouterView.svelte";
+  import { CTX_CHILDREN, CTX_ROUTE, CTX_ROUTER } from "./ctxKeys";
 
   export let router: Router;
   export let route: Route;
@@ -15,8 +15,8 @@
   setContext(CTX_CHILDREN, {
     subscribe: writable({
       routerViews: route._routerViews,
-      ssrState
-    }).subscribe
+      ssrState,
+    }).subscribe,
   });
 </script>
 

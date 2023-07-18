@@ -1,15 +1,18 @@
 <script lang="ts">
-  import { getContext, setContext, onDestroy } from 'svelte';
-  import { SvelteComponent } from 'svelte';
-  import { writable } from 'svelte/store';
-  import type { Writable, Readable } from 'svelte/store';
-  import { CTX_CHILDREN } from './ctxKeys';
-  import type { RouterViewResolved, ComponentModule, RouteProps, SSRState } from './Router';
+  import { SvelteComponent, getContext, onDestroy, setContext } from "svelte";
+  import { Readable, Writable, writable } from "svelte/store";
+  import {
+    ComponentModule,
+    RouteProps,
+    RouterViewResolved,
+    SSRState,
+  } from "./Router";
+  import { CTX_CHILDREN } from "./ctxKeys";
 
-  export let name = 'default';
+  export let name = "default";
 
   type Node = {
-    routerViews?: RouterViewResolved['children'];
+    routerViews?: RouterViewResolved["children"];
     ssrState?: SSRState;
   };
 
@@ -20,22 +23,25 @@
   const childrenStore: Writable<Node> = writable();
   setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe });
 
-  const unsubscribe = parentStore.subscribe(({ routerViews, ssrState } = {}) => {
-    view = routerViews?.[name];
+  const unsubscribe = parentStore.subscribe(
+    ({ routerViews, ssrState } = {}) => {
+      view = routerViews?.[name];
 
-    component = (view?.component as ComponentModule | undefined)?.default ||
-      view?.component as typeof SvelteComponent | undefined;
+      component =
+        (view?.component as ComponentModule | undefined)?.default ||
+        (view?.component as typeof SvelteComponent | undefined);
 
-    props = {
-      ...view?.props,
-      ...ssrState?.[name].data
-    };
+      props = {
+        ...view?.props,
+        ...ssrState?.[name].data,
+      };
 
-    childrenStore.set({
-      routerViews: view?.children,
-      ssrState: ssrState?.[name].children
-    });
-  });
+      childrenStore.set({
+        routerViews: view?.children,
+        ssrState: ssrState?.[name].children,
+      });
+    }
+  );
 
   onDestroy(unsubscribe);
 </script>
