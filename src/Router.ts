@@ -1,19 +1,17 @@
 import { StringCaster } from "cast-string";
-import { SvelteComponent } from "svelte";
-import UrlRouter from "url-router";
+import { ComponentType } from "svelte";
+import URLRouter from "url-router";
 
 export type PrimitiveType = string | number | boolean | null | undefined;
 
 export type ComponentModule = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  default: typeof SvelteComponent<any>;
+  default: ComponentType;
   load?: LoadFn;
   beforeEnter?: GuardHook;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type SyncComponent = ComponentModule | typeof SvelteComponent<any>;
-export type AsyncComponent = () => Promise<SyncComponent>;
+export type SyncComponent = ComponentModule | ComponentType;
+export type AsyncComponent = () => Promise<ComponentModule>;
 export type RouteProps =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Record<string, any> | ((route: Route) => Record<string, any>);
@@ -27,13 +25,19 @@ type SSRStateNode = {
 export type SSRState = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type LoadFn<Props = any, Ctx = any, Ret = any> = (
-  props: Props,
-  route: Route,
-  ssrContext?: Ctx
-) => Ret | Promise<Ret>;
+export type LoadFn<Props = any, Ctx = any, Ret = any> = {
+  (
+    props: Props,
+    route: Route,
+    ssrContext?: Ctx
+  ): Ret | Promise<Ret>;
+
+  deps?: (props: Props) => unknown[];
+  callOnClient?: boolean;
+};
 
 type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
+type LoadFnWrapperClient = (route: Route) => void;
 
 export type KeyFn = (route: Route) => PrimitiveType;
 
@@ -50,7 +54,6 @@ export type RouterViewDef = {
 };
 
 export type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
-type RouterViewDefStacks = RouterViewDef[][];
 
 export type RouterViewResolved = {
   name: string;
@@ -81,6 +84,7 @@ export type Route = {
   params: StringCaster;
   meta: Record<string, unknown>;
   href: string;
+  ssrState?: SSRState | null;
   _routerViews: Record<string, RouterViewResolved>;
   _beforeLeaveHooks: GuardHook[];
   _metaSetters: RouteProps[];
@@ -110,11 +114,6 @@ export type EventHooks = {
 };
 
 export type Mode = "server" | "client";
-
-export type HandlerResult = {
-  route: Route;
-  ssrState: SSRState | null;
-} | null;
 
 const detectedMode =
   typeof window !== "undefined" && window === globalThis && window.history
@@ -149,12 +148,15 @@ class HookInterrupt extends Error {
 export default class Router {
   private base?: string;
   private pathQuery?: string;
-  private urlRouter: UrlRouter<RouterViewDefStacks>;
+  private urlRouter: URLRouter<RouterViewDef[][]>;
   private beforeChangeHooks: GuardHook[] = [];
   private afterChangeHooks: NormalHook[] = [];
   private updateHooks: UpdateHook[] = [];
   private onPopStateWrapper: () => void;
   private mode?: Mode;
+  private mockedSSRContext?: unknown;
+  private callLoadOnClient?: boolean;
+  ssrState?: SSRState;
   current?: Route;
 
   constructor({
@@ -162,19 +164,28 @@ export default class Router {
     base,
     pathQuery,
     mode = detectedMode,
-    navigateOnStartup = true,
+    processInitialURL = true,
+    mockedSSRContext,
+    callLoadOnClient = Boolean(mockedSSRContext),
+    ssrState
   }: {
     routes: RouterViewDefGroup;
     base?: string;
     pathQuery?: string;
     mode?: Mode;
-    navigateOnStartup?: boolean;
+    processInitialURL?: boolean;
+    mockedSSRContext?: unknown;
+    callLoadOnClient?: boolean;
+    ssrState?: SSRState;
   }) {
-    this.urlRouter = new UrlRouter(this.flatRoutes(routes));
+    this.urlRouter = new URLRouter(this.flattenRoutes(routes));
     this.base = base;
     this.pathQuery = pathQuery;
     this.mode = mode;
     this.onPopStateWrapper = () => this.onPopState();
+    this.mockedSSRContext = mockedSSRContext;
+    this.callLoadOnClient = callLoadOnClient;
+    this.ssrState = ssrState;
 
     if (this.mode === "client") {
       window.addEventListener("popstate", this.onPopStateWrapper);
@@ -183,7 +194,7 @@ export default class Router {
         history.replaceState({ __position__: history.length }, "");
       }
 
-      if (navigateOnStartup) {
+      if (processInitialURL) {
         this.replace({
           path: location.href,
           state: history.state,
@@ -192,25 +203,26 @@ export default class Router {
     }
   }
 
-  private flatRoutes(
+  private flattenRoutes(
     routerViews: RouterViewDefGroup,
     sideViews: RouterViewDef[] = [],
     stacks: RouterViewDef[][] = [],
     result: Record<string, RouterViewDef[][]> = {}
   ) {
+    // Router views within the same array have higher priority than those outside it.
     const sideViewsInArray = routerViews.filter(
       (v): v is RouterViewDef => !Array.isArray(v) && !v.path
     );
+
     const sideViewNames = sideViewsInArray.map((v) => v.name);
 
-    // Router views in the same array have a higher priority than outer ones.
     sideViews = sideViews
       .filter((v) => !sideViewNames.includes(v.name))
       .concat(sideViewsInArray);
 
     for (const routerView of routerViews) {
       if (routerView instanceof Array) {
-        this.flatRoutes(routerView, sideViews, stacks, result);
+        this.flattenRoutes(routerView, sideViews, stacks, result);
       } else if (routerView.path || routerView.children) {
         const _stacks = [
           ...stacks,
@@ -222,7 +234,7 @@ export default class Router {
         if (routerView.path) {
           result[routerView.path] = _stacks;
         } else if (routerView.children) {
-          this.flatRoutes(routerView.children, sideViews, _stacks, result);
+          this.flattenRoutes(routerView.children, sideViews, _stacks, result);
         }
       }
     }
@@ -233,7 +245,7 @@ export default class Router {
   handle(
     location: string | Location,
     ssrContext?: unknown
-  ): Promise<HandlerResult> {
+  ): Promise<Route | null> {
     return Promise.resolve().then(() => {
       const loc = this.parseLocation(location);
       const matchedURLRoute = this.urlRouter.find(loc.path);
@@ -287,22 +299,55 @@ export default class Router {
                 this.updateRouteKeys(route);
                 const from = this.current;
                 this.current = route;
+
+                if (this.mode === "client") {
+                  if (this.ssrState) {
+                    route.ssrState = this.ssrState;
+                    this.ssrState = undefined;
+                  } else {
+
+                  }
+                } else {
+
+                }
+
                 this.emit("update", route);
                 this.emit("afterChange", route, from);
 
                 return this.mode === "client"
-                  ? { route, ssrState: null }
+                  ? route
                   : Promise.all(
                       loadFns.map((load) => load(route, ssrContext))
-                    ).then(() => ({
-                      route,
-                      ssrState,
-                    }));
+                    ).then(() => {
+                      route.ssrState = ssrState;
+                      return route;
+                    });
               }
             )
           )
       );
     });
+  }
+
+  parseLocation(location: string | Location): {
+    path: string;
+    query: StringCaster;
+    search: string;
+    hash: string;
+    state: Record<string, unknown>;
+    href: string;
+  } {
+    const url = this.locationToInternalURL(location);
+
+    return {
+      path: url.pathname,
+      query: new StringCaster(url.searchParams),
+      search: url.search,
+      hash: url.hash,
+      state:
+        typeof location === "string" || !location.state ? {} : location.state,
+      href: this.convertInternalUrlToHref(url),
+    };
   }
 
   private locationToInternalURL(location: string | Location) {
@@ -364,66 +409,8 @@ export default class Router {
     }
   }
 
-  parseLocation(location: string | Location): {
-    path: string;
-    query: StringCaster;
-    search: string;
-    hash: string;
-    state: Record<string, unknown>;
-    href: string;
-  } {
-    const url = this.locationToInternalURL(location);
-
-    return {
-      path: url.pathname,
-      query: new StringCaster(url.searchParams),
-      search: url.search,
-      hash: url.hash,
-      state:
-        typeof location === "string" || !location.state ? {} : location.state,
-      href: this.convertInternalUrlToHref(url),
-    };
-  }
-
   href(location: string | Location): string {
     return this.convertInternalUrlToHref(this.locationToInternalURL(location));
-  }
-
-  private runGuardHooks(
-    hooks: GuardHook[],
-    to: Route,
-    ssrContext: unknown,
-    onFulfilled: () => HandlerResult | Promise<HandlerResult>
-  ) {
-    let promise: Promise<HandlerResult> = Promise.resolve(null);
-
-    for (const hook of hooks) {
-      promise = promise.then(() =>
-        Promise.resolve(hook(to, this.current)).then((result) => {
-          if (result === true || result === undefined) {
-            return null;
-          } else if (result === false) {
-            throw new HookInterrupt();
-          } else {
-            throw new HookInterrupt(result);
-          }
-        })
-      );
-    }
-
-    promise = promise.then(onFulfilled, (e) => {
-      if (e instanceof HookInterrupt) {
-        if (e.location) {
-          return this.handle(e.location, ssrContext);
-        } else {
-          return null;
-        }
-      } else {
-        throw e;
-      }
-    });
-
-    return promise;
   }
 
   private resolveRoute(stacks: RouterViewDef[][]) {
@@ -435,7 +422,8 @@ export default class Router {
     const beforeLeaveHooks: GuardHook[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
     const loadFns: LoadFnWrapper[] = [];
-    const ssrState: SSRState | null = this.mode === "server" ? {} : null;
+    const clientLoadFns: LoadFnWrapperClient[] = [];
+    const ssrState: SSRState = {};
 
     let children = routerViews;
     let childState = ssrState;
@@ -452,6 +440,7 @@ export default class Router {
         beforeLeaveHooks,
         asyncComponentPromises,
         loadFns,
+        clientLoadFns,
         childState
       );
 
@@ -472,6 +461,7 @@ export default class Router {
       beforeLeaveHooks,
       asyncComponentPromises,
       loadFns,
+      clientLoadFns,
       ssrState,
     };
   }
@@ -487,7 +477,8 @@ export default class Router {
     beforeLeaveHooks: GuardHook[],
     asyncComponentPromises: Promise<SyncComponent>[],
     loadFns: LoadFnWrapper[],
-    ssrState: SSRState | null
+    clientLoadFns: LoadFnWrapperClient[],
+    ssrState: SSRState
   ): void {
     stack.forEach((routerViewDef) => {
       const {
@@ -526,42 +517,47 @@ export default class Router {
         keySetters.push((route) => (routerView.key = key(route)));
       }
 
-      if (ssrState) {
-        ssrState[name] = {};
-      }
+      ssrState[name] = {};
 
-      if (component instanceof Function && !component.prototype) {
-        const promise = (<AsyncComponent>component)();
+      if (component) {
+        const pushLoadFn = (load: LoadFn, ssrState: SSRStateNode) => {
+          if (this.mode === "client") {
+            if (load.callOnClient || load.callOnClient === undefined && this.callLoadOnClient) {
+              clientLoadFns.push((route) => {
 
-        promise.then((component) => {
-          routerViewDef.component = routerView.component = <ComponentModule>(
-            component
-          );
+                load(routerView.props, route, this.mockedSSRContext)
+              });
+            }
+          } else {
+            loadFns.push((route, ctx) =>
+              Promise.resolve(load(routerView.props || {}, route, ctx)).then(
+                (data) => (ssrState.data = data)
+              )
+            );
+          }
+        }
 
-          if (routerView.component.load && ssrState) {
+        if (component instanceof Function && !component.prototype) {
+          asyncComponentPromises.push((<AsyncComponent>component)().then((component) => {
+            routerViewDef.component = routerView.component = component;
+
+            if (component.load && ssrState) {
+              pushLoadFn(component.load, ssrState[name]);
+            }
+
+            return component;
+          }));
+        } else {
+          routerView.component = <ComponentModule>component;
+
+          if (routerView.component.beforeEnter) {
+            beforeEnterHooks.push(routerView.component.beforeEnter);
+          }
+
+          if (routerView.component.load) {
             pushLoadFn(routerView.component.load, ssrState[name]);
           }
-        });
-
-        asyncComponentPromises.push(promise);
-      } else {
-        routerView.component = <ComponentModule>component;
-
-        if (routerView.component?.beforeEnter) {
-          beforeEnterHooks.push(routerView.component.beforeEnter);
         }
-
-        if (routerView.component?.load && ssrState) {
-          pushLoadFn(routerView.component.load, ssrState[name]);
-        }
-      }
-
-      function pushLoadFn(load: LoadFn, ssrState: SSRStateNode) {
-        loadFns.push((route, ctx) =>
-          Promise.resolve(load(routerView.props || {}, route, ctx)).then(
-            (data) => (ssrState.data = data)
-          )
-        );
       }
 
       if (
@@ -583,10 +579,48 @@ export default class Router {
           beforeLeaveHooks,
           asyncComponentPromises,
           loadFns,
-          ssrState ? (ssrState[name].children = {}) : null
+          clientLoadFns,
+          ssrState[name].children = {}
         );
       }
     });
+  }
+
+  private runGuardHooks(
+    hooks: GuardHook[],
+    to: Route,
+    ssrContext: unknown,
+    onFulfilled: () => Route | null | Promise<Route | null>
+  ) {
+    let promise: Promise<Route | null> = Promise.resolve(null);
+
+    for (const hook of hooks) {
+      promise = promise.then(() =>
+        Promise.resolve(hook(to, this.current)).then((result) => {
+          if (result === true || result === undefined) {
+            return null;
+          } else if (result === false) {
+            throw new HookInterrupt();
+          } else {
+            throw new HookInterrupt(result);
+          }
+        })
+      );
+    }
+
+    promise = promise.then(onFulfilled, (e) => {
+      if (e instanceof HookInterrupt) {
+        if (e.location) {
+          return this.handle(e.location, ssrContext);
+        } else {
+          return null;
+        }
+      } else {
+        throw e;
+      }
+    });
+
+    return promise;
   }
 
   private updateRoute(route: Route) {
@@ -630,30 +664,30 @@ export default class Router {
   }
 
   push(location: string | Location): void {
-    this.handle(location).then((result) => {
-      if (this.mode === "client" && result) {
+    this.handle(location).then((route) => {
+      if (this.mode === "client" && route) {
         history.pushState(
           {
-            ...result.route.state,
+            ...route.state,
             __position__: history.state.__position__ + 1,
           },
           "",
-          result.route.href
+          route.href
         );
       }
     });
   }
 
   replace(location: string | Location): void {
-    this.handle(location).then((result) => {
-      if (this.mode === "client" && result) {
+    this.handle(location).then((route) => {
+      if (this.mode === "client" && route) {
         history.replaceState(
           {
-            ...result.route.state,
+            ...route.state,
             __position__: history.state.__position__,
           },
           "",
-          result.route.href
+          route.href
         );
       }
     });
@@ -663,15 +697,15 @@ export default class Router {
     this.handle({
       path: location.href,
       state: { ...history.state, ...state },
-    }).then((result) => {
-      if (result) {
+    }).then((route) => {
+      if (route) {
         history.replaceState(
           {
-            ...result.route.state,
+            ...route.state,
             __position__: history.state?.__position__ || history.length,
           },
           "",
-          result.route.href
+          route.href
         );
       } else {
         this.silentGo(

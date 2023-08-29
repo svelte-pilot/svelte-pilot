@@ -512,10 +512,10 @@ const router = new Router({
 
 ### mode
 `'server'` | `'client'`. Optional. Defines the running mode.
-If not set, it will auto detect by `typeof window !== 'undefined' && window === globalThis ? 'client' : 'server'`.
+If not set, it will auto detect by `typeof window !== "undefined" && window === globalThis && window.history ? 'client' : 'server'`.
 
-### navigateOnStartup
-`boolean`. Optional. Whether to trigger the navigation when the router is initialized. Defaults to `true`.
+### processInitialURL
+`boolean`. Optional. Whether to process the current URL when the router is initialized. Defaults to `true`. If set to `false`, manually handle it using `router.replace({ path: location.href, state: history.state });`.
 
 ## Route Object
 A route object contains these information of the matched route:
