@@ -540,7 +540,7 @@ export default class Router {
         const pushLoadFn = (load: LoadFn, ssrState: SSRStateNode) => {
           if (this.mode === "client") {
             if (load.callOnClient || load.callOnClient === undefined && this.callLoadOnClient) {
-              clientLoadFns.push((route) => {
+              clientLoadFns.push(async(route) => {
                 let key = "";
                 const props = routerView.props;
 
@@ -564,16 +564,12 @@ export default class Router {
                 if (cache?.[key]) {
                   setState(cache[key]);
                 } else {
-                  load(routerView.props || {}, route, this.mockedSSRContext).then(setState);
+                  setState(await load(routerView.props || {}, route, this.mockedSSRContext));
                 }
               });
             }
           } else {
-            loadFns.push((route, ctx) =>
-              Promise.resolve(load(routerView.props || {}, route, ctx)).then(
-                (data) => (ssrState.data = data)
-              )
-            );
+            loadFns.push(async (route, ctx) => ssrState.data = await load(routerView.props || {}, route, ctx));
           }
         }
 
