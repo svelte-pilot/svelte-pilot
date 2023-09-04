@@ -13,8 +13,8 @@ export type ComponentModule = {
 export type SyncComponent = ComponentModule | ComponentType;
 export type AsyncComponent = () => Promise<ComponentModule>;
 export type RouteProps =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Record<string, any> | ((route: Route) => Record<string, any>);
+  | Record<string, unknown>
+  | ((route: Route) => Record<string, unknown>);
 export type PropSetters = Array<(route: Route) => Record<string, unknown>>;
 
 type SSRStateNode = {
@@ -26,18 +26,13 @@ export type SSRState = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LoadFn<Props = any, Ctx = any, Ret = any> = {
-  (
-    props: Props,
-    route: Route,
-    ssrContext?: Ctx
-  ): Ret | Promise<Ret>;
-
+  (props: Props, route: Route, ssrContext: Ctx): Ret | Promise<Ret>;
   watch?: string[];
   callOnClient?: boolean;
 };
 
-type LoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
-type LoadFnWrapperClient = (route: Route) => void;
+type ServerLoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
+type ClientLoadFnWrapper = (route: Route) => void;
 
 export type KeyFn = (route: Route) => PrimitiveType;
 
@@ -84,7 +79,7 @@ export type Route = {
   params: StringCaster;
   meta: Record<string, unknown>;
   href: string;
-  ssrState?: SSRState | null;
+  ssrState: SSRState;
   _ssrStateMap: Map<LoadFn, Record<string, Record<string, unknown>>>;
   _routerViews: Record<string, RouterViewResolved>;
   _beforeLeaveHooks: GuardHook[];
@@ -138,18 +133,18 @@ function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
 }
 
 export default class Router {
-  private base?: string;
-  private pathQuery?: string;
+  base?: string;
+  pathQuery?: string;
+  mode?: Mode;
+  mockedSSRContext?: unknown;
+  callLoadOnClient?: boolean;
+  ssrState?: SSRState;
+  current?: Route;
   private urlRouter: URLRouter<RouterViewDef[][]>;
   private beforeChangeHooks: GuardHook[] = [];
   private afterChangeHooks: NormalHook[] = [];
   private updateHooks: UpdateHook[] = [];
   private onPopStateWrapper: () => void;
-  private mode?: Mode;
-  private mockedSSRContext?: unknown;
-  private callLoadOnClient?: boolean;
-  ssrState?: SSRState;
-  current?: Route;
 
   constructor({
     routes,
@@ -159,7 +154,7 @@ export default class Router {
     processInitialURL = true,
     mockedSSRContext,
     callLoadOnClient = Boolean(mockedSSRContext),
-    ssrState
+    ssrState,
   }: {
     routes: RouterViewDefGroup;
     base?: string;
@@ -234,7 +229,10 @@ export default class Router {
     return result;
   }
 
-  async handle(location: string | Location, ssrContext?: unknown): Promise<Route | null | false> {
+  async handle(
+    location: string | Location,
+    ssrContext?: unknown
+  ): Promise<Route | null | false> {
     const loc = this.parseLocation(location);
     const matchedURLRoute = this.urlRouter.find(loc.path);
 
@@ -250,7 +248,7 @@ export default class Router {
       beforeEnterHooks,
       beforeLeaveHooks,
       asyncComponentPromises,
-      loadFns,
+      serverLoadFns,
       clientLoadFns,
       ssrState,
     } = this.resolveRoute(matchedURLRoute.handler);
@@ -269,74 +267,82 @@ export default class Router {
     };
 
     this.updateRouteMeta(route);
-
-    let ret = await this.runGuardHooks(
-      (this.current?._beforeLeaveHooks || []).concat(
-        this.beforeChangeHooks,
-        beforeEnterHooks
-      ),
-      route,
-      ssrContext
-    );
-
-    if (ret !== true) {
-      return ret;
-    }
-
-    const modules = await Promise.all(asyncComponentPromises);
-
-    ret = await this.runGuardHooks(
-      modules
-        .filter((m): m is ComponentModule => "beforeEnter" in m)
-        .map((m) => <GuardHook>m.beforeEnter),
-      route,
-      ssrContext
-    );
-
-    if (ret !== true) {
-      return ret;
-    }
-
     this.updateRouteProps(route);
     this.updateRouteKeys(route);
 
     if (this.mode === "client") {
-      if (this.ssrState) {
-        const restore = (ssrStateNode: SSRState, routerViews:  Record<string, RouterViewResolved>) => {
-          Object.entries(ssrStateNode).forEach(([name, ssrStateNode]) => {
-            const routerView = routerViews[name];
+      const ret = await this.runGuardHooks(
+        (this.current?._beforeLeaveHooks || []).concat(
+          this.beforeChangeHooks,
+          beforeEnterHooks
+        ),
+        route,
+        ssrContext
+      );
 
-            if (ssrStateNode.data) {
-              const load = (routerView.component as ComponentModule).load as LoadFn;
-              const records = route._ssrStateMap.get(load) || {};
-              let key = "";
-              const { props } = routerView;
-
-              if (props) {
-                if (load.watch) {
-                  key = JSON.stringify(load.watch.map((k) => props[k]));
-                } else {
-                  key = JSON.stringify(Object.values(props));
-                }
-              }
-
-              records[key] = ssrStateNode.data;
-            }
-
-            if (ssrStateNode.children && routerView.children) {
-              restore(ssrStateNode.children, routerView.children);
-            }
-          });
-        }
-
-        route.ssrState = this.ssrState;
-        this.ssrState = undefined;
-        restore(route.ssrState, route._routerViews);
-      } else {
-        clientLoadFns.map((fn) => fn(route));
+      if (ret !== true) {
+        return ret;
       }
+    }
+
+    const modules = await Promise.all(asyncComponentPromises);
+
+    if (this.mode === "client") {
+      const ret = await this.runGuardHooks(
+        modules
+          .filter((m): m is ComponentModule => "beforeEnter" in m)
+          .map((m) => <GuardHook>m.beforeEnter),
+        route,
+        ssrContext
+      );
+
+      if (ret !== true) {
+        return ret;
+      }
+    }
+
+    if (this.mode === "server") {
+      await Promise.all(serverLoadFns.map((fn) => fn(route, ssrContext)));
+      return route;
+    }
+
+    if (this.ssrState) {
+      const restore = (
+        ssrStateNode: SSRState,
+        routerViews: Record<string, RouterViewResolved>
+      ) => {
+        Object.entries(ssrStateNode).forEach(([name, ssrStateNode]) => {
+          const routerView = routerViews[name];
+
+          if (ssrStateNode.data) {
+            const load = (routerView.component as ComponentModule)
+              .load as LoadFn;
+            const records = route._ssrStateMap.get(load) || {};
+            let key = "";
+            const { props } = routerView;
+
+            if (props) {
+              if (load.watch) {
+                key = JSON.stringify(load.watch.map((k) => props[k]));
+              } else {
+                key = JSON.stringify(Object.values(props));
+              }
+            }
+
+            records[key] = ssrStateNode.data;
+          }
+
+          if (ssrStateNode.children && routerView.children) {
+            restore(ssrStateNode.children, routerView.children);
+          }
+        });
+      };
+
+      route.ssrState = this.ssrState;
+      this.ssrState = undefined;
+      restore(route.ssrState, route._routerViews);
     } else {
-      loadFns.map((fn) => fn(route, ssrContext));
+      await Promise.all(clientLoadFns.map((fn) => fn(route)));
     }
 
     const from = this.current;
@@ -438,8 +444,8 @@ export default class Router {
     const beforeEnterHooks: GuardHook[] = [];
     const beforeLeaveHooks: GuardHook[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
-    const loadFns: LoadFnWrapper[] = [];
-    const clientLoadFns: LoadFnWrapperClient[] = [];
+    const serverLoadFns: ServerLoadFnWrapper[] = [];
+    const clientLoadFns: ClientLoadFnWrapper[] = [];
     const ssrState: SSRState = {};
 
     let children = routerViews;
@@ -456,7 +462,7 @@ export default class Router {
         beforeEnterHooks,
         beforeLeaveHooks,
         asyncComponentPromises,
-        loadFns,
+        serverLoadFns,
         clientLoadFns,
         childState
       );
@@ -477,7 +483,7 @@ export default class Router {
       beforeEnterHooks,
       beforeLeaveHooks,
       asyncComponentPromises,
-      loadFns,
+      serverLoadFns,
       clientLoadFns,
       ssrState,
     };
@@ -493,8 +499,8 @@ export default class Router {
     beforeEnterHooks: GuardHook[],
     beforeLeaveHooks: GuardHook[],
     asyncComponentPromises: Promise<SyncComponent>[],
-    loadFns: LoadFnWrapper[],
-    clientLoadFns: LoadFnWrapperClient[],
+    serverLoadFns: ServerLoadFnWrapper[],
+    clientLoadFns: ClientLoadFnWrapper[],
     ssrState: SSRState
   ): void {
     stack.forEach((routerViewDef) => {
@@ -539,13 +545,18 @@ export default class Router {
       if (component) {
         const pushLoadFn = (load: LoadFn, ssrState: SSRStateNode) => {
           if (this.mode === "client") {
-            if (load.callOnClient || load.callOnClient === undefined && this.callLoadOnClient) {
-              clientLoadFns.push(async(route) => {
+            if (
+              load.callOnClient ||
+              (load.callOnClient === undefined && this.callLoadOnClient)
+            ) {
+              clientLoadFns.push(async (route) => {
                 let key = "";
                 const props = routerView.props;
 
                 if (props) {
-                  key = JSON.stringify(load.watch?.map((k) => props[k]) || Object.values(props));
+                  key = JSON.stringify(
+                    load.watch?.map((k) => props[k]) || Object.values(props)
+                  );
                 }
 
                 const setState = (data: Record<string, unknown>) => {
@@ -564,25 +575,36 @@ export default class Router {
                 if (cache?.[key]) {
                   setState(cache[key]);
                 } else {
-                  setState(await load(routerView.props || {}, route, this.mockedSSRContext));
+                  setState(
+                    await load(
+                      routerView.props || {},
+                      route,
+                      this.mockedSSRContext
+                    )
+                  );
                 }
               });
             }
           } else {
-            loadFns.push(async (route, ctx) => ssrState.data = await load(routerView.props || {}, route, ctx));
+            serverLoadFns.push(
+              async (route, ctx) =>
+                (ssrState.data = await load(routerView.props || {}, route, ctx))
+            );
           }
-        }
+        };
 
         if (component instanceof Function && !component.prototype) {
-          asyncComponentPromises.push((<AsyncComponent>component)().then((component) => {
-            routerViewDef.component = routerView.component = component;
+          asyncComponentPromises.push(
+            (<AsyncComponent>component)().then((component) => {
+              routerViewDef.component = routerView.component = component;
 
-            if (component.load && ssrState) {
-              pushLoadFn(component.load, ssrState[name]);
-            }
+              if (component.load && ssrState) {
+                pushLoadFn(component.load, ssrState[name]);
+              }
 
-            return component;
-          }));
+              return component;
+            })
+          );
         } else {
           routerView.component = <ComponentModule>component;
 
@@ -614,9 +636,9 @@ export default class Router {
           beforeEnterHooks,
           beforeLeaveHooks,
           asyncComponentPromises,
-          loadFns,
+          serverLoadFns,
           clientLoadFns,
-          ssrState[name].children = {}
+          (ssrState[name].children = {})
         );
       }
     });
@@ -682,57 +704,57 @@ export default class Router {
     }
   }
 
-  push(location: string | Location): void {
-    this.handle(location).then((route) => {
-      if (this.mode === "client" && route) {
-        history.pushState(
-          {
-            ...route.state,
-            __position__: history.state.__position__ + 1,
-          },
-          "",
-          route.href
-        );
-      }
-    });
+  async push(location: string | Location): Promise<void> {
+    const route = await this.handle(location);
+
+    if (this.mode === "client" && route) {
+      history.pushState(
+        {
+          ...route.state,
+          __position__: history.state.__position__ + 1,
+        },
+        "",
+        route.href
+      );
+    }
   }
 
-  replace(location: string | Location): void {
-    this.handle(location).then((route) => {
-      if (this.mode === "client" && route) {
-        history.replaceState(
-          {
-            ...route.state,
-            __position__: history.state.__position__,
-          },
-          "",
-          route.href
-        );
-      }
-    });
+  async replace(location: string | Location): Promise<void> {
+    const route = await this.handle(location);
+
+    if (this.mode === "client" && route) {
+      history.replaceState(
+        {
+          ...route.state,
+          __position__: history.state.__position__,
+        },
+        "",
+        route.href
+      );
+    }
   }
 
-  private onPopState(state?: Record<string, unknown>): void {
-    this.handle({
+  private async onPopState(state?: Record<string, unknown>): Promise<void> {
+    const route = await this.handle({
       path: location.href,
       state: { ...history.state, ...state },
-    }).then((route) => {
-      if (route) {
-        history.replaceState(
-          {
-            ...route.state,
-            __position__: history.state?.__position__ || history.length,
-          },
-          "",
-          route.href
-        );
-      } else {
-        this.silentGo(
-          <number>(<Route>this.current).state.__position__ -
-            history.state.__position__
-        );
-      }
     });
+
+    if (route) {
+      history.replaceState(
+        {
+          ...route.state,
+          __position__: history.state?.__position__ || history.length,
+        },
+        "",
+        route.href
+      );
+    } else {
+      this.silentGo(
+        <number>(<Route>this.current).state.__position__ -
+          history.state.__position__
+      );
+    }
   }
 
   private silentGo(delta: number, callback?: () => void): void {

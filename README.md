@@ -760,8 +760,8 @@ type NormalHook = (to: Route, from?: Route) => void;
 3. `beforeCurrentRouteLeave` hooks registered via `router.on('beforeCurrentRouteLeave', hook)` are called.
 4. `beforeChange` hooks registered via `router.on('beforeChange', hook)` are called.
 5. `beforeEnter` hooks in the incoming `RouterView` configurations and `beforeEnter` hooks exported from the context
-    module (`<script context="module">`) of an aync Svelte component are called.
-6. `beforeEnter` hooks exported from the context module of an async Svelte component are called.
+    module (`<script context="module">`) of sync Svelte components are called.
+6. `beforeEnter` hooks exported from the context module of async Svelte components are called.
 7. `update` hooks registered via `router.on('update', hook)` are called.
 8. `afterChange` hooks registered via `router.on('afterChange', hook)` are called.
 

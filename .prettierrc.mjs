@@ -1,5 +1,5 @@
 export default {
-  plugins: ["prettier-plugin-organize-imports", "prettier-plugin-tailwindcss"],
+  plugins: ["prettier-plugin-organize-imports"],
   organizeImportsSkipDestructiveCodeActions: true,
 
   // https://gist.github.com/adbutterfield/6b91625b5b07ca2c29f6322245e3e2bb
@@ -260,5 +260,5 @@ export default {
    * singleAttributePerLine: "<bool>"
    * default: "false"
    */
-  singleAttributePerLine: "false",
+  singleAttributePerLine: false,
 };
