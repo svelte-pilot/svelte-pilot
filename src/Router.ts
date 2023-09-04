@@ -110,6 +110,7 @@ export type EventHooks = {
 };
 
 export type Mode = "server" | "client";
+type RouterLinkMethod = "push" | "replace" | "href";
 
 const detectedMode =
   typeof window !== "undefined" && window === globalThis && window.history
@@ -133,13 +134,14 @@ function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
 }
 
 export default class Router {
+  mode: Mode;
   base?: string;
   pathQuery?: string;
-  mode?: Mode;
   mockedSSRContext?: unknown;
   callLoadOnClient?: boolean;
   ssrState?: SSRState;
   current?: Route;
+  routerLinkDefaultMethod: RouterLinkMethod = "push";
   private urlRouter: URLRouter<RouterViewDef[][]>;
   private beforeChangeHooks: GuardHook[] = [];
   private afterChangeHooks: NormalHook[] = [];
@@ -155,6 +157,7 @@ export default class Router {
     mockedSSRContext,
     callLoadOnClient = Boolean(mockedSSRContext),
     ssrState,
+    routerLinkDefaultMethod = "push",
   }: {
     routes: RouterViewDefGroup;
     base?: string;
@@ -164,6 +167,7 @@ export default class Router {
     mockedSSRContext?: unknown;
     callLoadOnClient?: boolean;
     ssrState?: SSRState;
+    routerLinkDefaultMethod?: RouterLinkMethod;
   }) {
     this.urlRouter = new URLRouter(this.flattenRoutes(routes));
     this.base = base;
@@ -173,6 +177,7 @@ export default class Router {
     this.mockedSSRContext = mockedSSRContext;
     this.callLoadOnClient = callLoadOnClient;
     this.ssrState = ssrState;
+    this.routerLinkDefaultMethod = routerLinkDefaultMethod;
 
     if (this.mode === "client") {
       window.addEventListener("popstate", this.onPopStateWrapper);

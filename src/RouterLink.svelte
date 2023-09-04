@@ -7,17 +7,22 @@
 
   let className = "";
 
-  export { className as class };
-  export let to: string | Location;
-  export let replace = false;
-
   const router = getContext(CTX_ROUTER) as Router;
   const route = getContext(CTX_ROUTE) as Writable<Route>;
+
+  export { className as class };
+  export let to: string | Location;
+  export let method: "push" | "replace" | "href" =
+    router.routerLinkDefaultMethod;
 
   $: loc = router.parseLocation(to);
   $: active = loc.path === $route.path;
 
   function onClick(e: Event) {
+    if (method === "href") {
+      return;
+    }
+
     e.preventDefault();
     const current = $route;
 
@@ -29,7 +34,7 @@
       );
 
     if (!isSameLoc) {
-      if (replace) {
+      if (method === "replace") {
         router.replace(to);
       } else {
         router.push(to);
