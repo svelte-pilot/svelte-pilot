@@ -6,8 +6,8 @@ export type PrimitiveType = string | number | boolean | null | undefined;
 
 export type ComponentModule = {
   default: ComponentType;
-  load?: LoadFn;
-  beforeEnter?: GuardHook;
+  load?: LoadFunction;
+  beforeEnter?: NavigationGuard;
 };
 
 export type SyncComponent = ComponentModule | ComponentType;
@@ -19,53 +19,53 @@ export type PropSetters = Array<(route: Route) => Record<string, unknown>>;
 
 type SSRStateNode = {
   data?: Record<string, unknown>;
-  children?: SSRState;
+  children?: SSRStateTree;
 };
 
-export type SSRState = Record<string, SSRStateNode>;
+export type SSRStateTree = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type LoadFn<Props = any, Ctx = any, Ret = any> = {
+export type LoadFunction<Props = any, Ctx = any, Ret = any> = {
   (props: Props, route: Route, ssrContext: Ctx): Ret | Promise<Ret>;
   watch?: string[];
   callOnClient?: boolean;
 };
 
-type ServerLoadFnWrapper = (route: Route, ssrContext?: unknown) => void;
-type ClientLoadFnWrapper = (route: Route) => void;
+type ServerLoadFunctionWrapper = (route: Route, ssrContext?: unknown) => void;
+type ClientLoadFunctionWrapper = (route: Route) => void;
 
-export type KeyFn = (route: Route) => PrimitiveType;
+export type KeyFunction = (route: Route) => PrimitiveType;
 
-export type RouterViewDef = {
+export type ViewConfig = {
   name?: string;
   path?: string;
   component?: SyncComponent | AsyncComponent;
   props?: RouteProps;
-  key?: KeyFn;
+  key?: KeyFunction;
   meta?: RouteProps;
-  children?: RouterViewDefGroup;
-  beforeEnter?: GuardHook;
-  beforeLeave?: GuardHook;
+  children?: ViewConfigGroup;
+  beforeEnter?: NavigationGuard;
+  beforeLeave?: NavigationGuard;
 };
 
-export type RouterViewDefGroup = Array<RouterViewDef | RouterViewDef[]>;
+export type ViewConfigGroup = Array<ViewConfig | ViewConfig[]>;
 
-export type RouterViewResolved = {
+export type ResolvedView = {
   name: string;
   component?: SyncComponent;
   props?: Record<string, unknown>;
   key?: PrimitiveType;
-  children?: Record<string, RouterViewResolved>;
+  children?: Record<string, ResolvedView>;
 };
 
-export type Query =
+export type QueryParams =
   | Record<string, PrimitiveType | PrimitiveType[]>
   | URLSearchParams;
 
 export type Location = {
   path: string;
   params?: Record<string, string | number | boolean>;
-  query?: Query;
+  query?: QueryParams;
   hash?: string;
   state?: Record<string, unknown>;
 };
@@ -79,34 +79,36 @@ export type Route = {
   params: StringCaster;
   meta: Record<string, unknown>;
   href: string;
-  ssrState: SSRState;
-  _ssrStateMap: Map<LoadFn, Record<string, Record<string, unknown>>>;
-  _routerViews: Record<string, RouterViewResolved>;
-  _beforeLeaveHooks: GuardHook[];
+  ssrState: SSRStateTree;
+  _ssrStateMap: Map<LoadFunction, Record<string, Record<string, unknown>>>;
+  _routerViews: Record<string, ResolvedView>;
+  _beforeLeaveHandlers: NavigationGuard[];
   _metaSetters: RouteProps[];
   _propSetters: PropSetters;
-  _keySetters: KeyFn[];
+  _keySetters: KeyFunction[];
 };
 
-export type GuardHookResult = void | boolean | string | Location;
+export type NavigationGuardResult = void | boolean | string | Location;
 
-export type GuardHook = (
+export type NavigationGuard = (
   to: Route,
   from?: Route
-) => GuardHookResult | Promise<GuardHookResult>;
-export type NormalHook = (to: Route, from?: Route) => void;
-export type UpdateHook = (route: Route) => void;
+) => NavigationGuardResult | Promise<NavigationGuardResult>;
+
+export type SimpleHandler = (to: Route, from?: Route) => void;
+export type UpdateHandler = (route: Route) => void;
+
 export type Events =
   | "beforeChange"
   | "beforeCurrentRouteLeave"
   | "update"
   | "afterChange";
 
-export type EventHooks = {
-  beforeCurrentRouteLeave: GuardHook;
-  beforeChange: GuardHook;
-  update: UpdateHook;
-  afterChange: NormalHook;
+export type EventHandlers = {
+  beforeCurrentRouteLeave: NavigationGuard;
+  beforeChange: NavigationGuard;
+  update: UpdateHandler;
+  afterChange: SimpleHandler;
 };
 
 export type Mode = "server" | "client";
@@ -117,7 +119,10 @@ const detectedMode =
     ? "client"
     : "server";
 
-function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
+function appendSearchParams(
+  searchParams: URLSearchParams,
+  q: QueryParams
+): void {
   if (q instanceof URLSearchParams) {
     q.forEach((val, key) => searchParams.append(key, val));
   } else {
@@ -135,23 +140,23 @@ function appendSearchParams(searchParams: URLSearchParams, q: Query): void {
 
 export default class Router {
   mode: Mode;
-  base?: string;
-  pathQuery?: string;
+  base: string;
+  pathQuery: string;
   mockedSSRContext?: unknown;
-  callLoadOnClient?: boolean;
-  ssrState?: SSRState;
+  callLoadOnClient: boolean;
+  ssrState?: SSRStateTree;
   current?: Route;
   routerLinkDefaultMethod: RouterLinkMethod = "push";
-  private urlRouter: URLRouter<RouterViewDef[][]>;
-  private beforeChangeHooks: GuardHook[] = [];
-  private afterChangeHooks: NormalHook[] = [];
-  private updateHooks: UpdateHook[] = [];
+  private urlRouter: URLRouter<ViewConfig[][]>;
+  private beforeChangeHandlers: NavigationGuard[] = [];
+  private afterChangeHandlers: SimpleHandler[] = [];
+  private updateHandlers: UpdateHandler[] = [];
   private onPopStateWrapper: () => void;
 
   constructor({
     routes,
-    base,
-    pathQuery,
+    base = "",
+    pathQuery = "",
     mode = detectedMode,
     processInitialURL = true,
     mockedSSRContext,
@@ -159,17 +164,17 @@ export default class Router {
     ssrState,
     routerLinkDefaultMethod = "push",
   }: {
-    routes: RouterViewDefGroup;
+    routes: ViewConfigGroup;
     base?: string;
     pathQuery?: string;
     mode?: Mode;
     processInitialURL?: boolean;
     mockedSSRContext?: unknown;
     callLoadOnClient?: boolean;
-    ssrState?: SSRState;
+    ssrState?: SSRStateTree;
     routerLinkDefaultMethod?: RouterLinkMethod;
   }) {
-    this.urlRouter = new URLRouter(this.flattenRoutes(routes));
+    this.urlRouter = new URLRouter(this.toViewConfigLayers(routes));
     this.base = base;
     this.pathQuery = pathQuery;
     this.mode = mode;
@@ -195,38 +200,48 @@ export default class Router {
     }
   }
 
-  private flattenRoutes(
-    routerViews: RouterViewDefGroup,
-    sideViews: RouterViewDef[] = [],
-    stacks: RouterViewDef[][] = [],
-    result: Record<string, RouterViewDef[][]> = {}
+  private toViewConfigLayers(
+    viewConfigGroup: ViewConfigGroup,
+    sideViewConfigArray: ViewConfig[] = [],
+    layers: ViewConfig[][] = [],
+    result: Record<string, ViewConfig[][]> = {}
   ) {
-    // Router views within the same array have higher priority than those outside it.
-    const sideViewsInArray = routerViews.filter(
-      (v): v is RouterViewDef => !Array.isArray(v) && !v.path
+    // Views within the same array have higher priority than those outside it.
+    const sideViewsWithinGroup = viewConfigGroup.filter(
+      (v): v is ViewConfig => !Array.isArray(v) && !v.path
     );
 
-    const sideViewNames = sideViewsInArray.map((v) => v.name);
+    const sideViewNames = sideViewsWithinGroup.map((v) => v.name);
 
-    sideViews = sideViews
+    sideViewConfigArray = sideViewConfigArray
       .filter((v) => !sideViewNames.includes(v.name))
-      .concat(sideViewsInArray);
+      .concat(sideViewsWithinGroup);
 
-    for (const routerView of routerViews) {
-      if (routerView instanceof Array) {
-        this.flattenRoutes(routerView, sideViews, stacks, result);
-      } else if (routerView.path || routerView.children) {
+    for (const viewConfig of viewConfigGroup) {
+      if (viewConfig instanceof Array) {
+        this.toViewConfigLayers(
+          viewConfig,
+          sideViewConfigArray,
+          layers,
+          result
+        );
+      } else if (viewConfig.path || viewConfig.children) {
         const _stacks = [
-          ...stacks,
-          sideViews
-            .filter((v) => v.name !== routerView.name)
-            .concat(routerView),
+          ...layers,
+          sideViewConfigArray
+            .filter((v) => v.name !== viewConfig.name)
+            .concat(viewConfig),
         ];
 
-        if (routerView.path) {
-          result[routerView.path] = _stacks;
-        } else if (routerView.children) {
-          this.flattenRoutes(routerView.children, sideViews, _stacks, result);
+        if (viewConfig.path) {
+          result[viewConfig.path] = _stacks;
+        } else if (viewConfig.children) {
+          this.toViewConfigLayers(
+            viewConfig.children,
+            sideViewConfigArray,
+            _stacks,
+            result
+          );
         }
       }
     }
@@ -250,13 +265,13 @@ export default class Router {
       metaSetters,
       propSetters,
       keySetters,
-      beforeEnterHooks,
-      beforeLeaveHooks,
+      beforeEnterHandlers,
+      beforeLeaveHandlers,
       asyncComponentPromises,
-      serverLoadFns,
-      clientLoadFns,
+      serverLoadFunctions,
+      clientLoadFunctions,
       ssrState,
-    } = this.resolveRoute(matchedURLRoute.handler);
+    } = this.resolveViewConfigGroup(matchedURLRoute.handler);
 
     const route: Route = {
       ...loc,
@@ -265,21 +280,19 @@ export default class Router {
       ssrState,
       _ssrStateMap: new Map(),
       _routerViews: routerViews,
-      _beforeLeaveHooks: beforeLeaveHooks,
+      _beforeLeaveHandlers: beforeLeaveHandlers,
       _metaSetters: metaSetters,
       _propSetters: propSetters,
       _keySetters: keySetters,
     };
 
-    this.updateRouteMeta(route);
-    this.updateRouteProps(route);
-    this.updateRouteKeys(route);
+    this.updateRoute(route);
 
     if (this.mode === "client") {
-      const ret = await this.runGuardHooks(
-        (this.current?._beforeLeaveHooks || []).concat(
-          this.beforeChangeHooks,
-          beforeEnterHooks
+      const ret = await this.callNavigationGuards(
+        (this.current?._beforeLeaveHandlers || []).concat(
+          this.beforeChangeHandlers,
+          beforeEnterHandlers
         ),
         route,
         ssrContext
@@ -293,10 +306,10 @@ export default class Router {
     const modules = await Promise.all(asyncComponentPromises);
 
     if (this.mode === "client") {
-      const ret = await this.runGuardHooks(
+      const ret = await this.callNavigationGuards(
         modules
           .filter((m): m is ComponentModule => "beforeEnter" in m)
-          .map((m) => <GuardHook>m.beforeEnter),
+          .map((m) => <NavigationGuard>m.beforeEnter),
         route,
         ssrContext
       );
@@ -307,21 +320,21 @@ export default class Router {
     }
 
     if (this.mode === "server") {
-      await Promise.all(serverLoadFns.map((fn) => fn(route, ssrContext)));
+      await Promise.all(serverLoadFunctions.map((fn) => fn(route, ssrContext)));
       return route;
     }
 
     if (this.ssrState) {
       const restore = (
-        ssrStateNode: SSRState,
-        routerViews: Record<string, RouterViewResolved>
+        ssrStateNode: SSRStateTree,
+        routerViews: Record<string, ResolvedView>
       ) => {
         Object.entries(ssrStateNode).forEach(([name, ssrStateNode]) => {
           const routerView = routerViews[name];
 
           if (ssrStateNode.data) {
             const load = (routerView.component as ComponentModule)
-              .load as LoadFn;
+              .load as LoadFunction;
             const records = route._ssrStateMap.get(load) || {};
             let key = "";
             const { props } = routerView;
@@ -347,7 +360,7 @@ export default class Router {
       this.ssrState = undefined;
       restore(route.ssrState, route._routerViews);
     } else {
-      await Promise.all(clientLoadFns.map((fn) => fn(route)));
+      await Promise.all(clientLoadFunctions.map((fn) => fn(route)));
     }
 
     const from = this.current;
@@ -441,22 +454,22 @@ export default class Router {
     return this.convertInternalUrlToHref(this.locationToInternalURL(location));
   }
 
-  private resolveRoute(stacks: RouterViewDef[][]) {
-    const routerViews: Record<string, RouterViewResolved> = {};
+  private resolveViewConfigGroup(layers: ViewConfig[][]) {
+    const routerViews: Record<string, ResolvedView> = {};
     const metaSetters: RouteProps[] = [];
     const propSetters: PropSetters = [];
-    const keySetters: KeyFn[] = [];
-    const beforeEnterHooks: GuardHook[] = [];
-    const beforeLeaveHooks: GuardHook[] = [];
+    const keySetters: KeyFunction[] = [];
+    const beforeEnterHandlers: NavigationGuard[] = [];
+    const beforeLeaveHandlers: NavigationGuard[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
-    const serverLoadFns: ServerLoadFnWrapper[] = [];
-    const clientLoadFns: ClientLoadFnWrapper[] = [];
-    const ssrState: SSRState = {};
+    const serverLoadFunctions: ServerLoadFunctionWrapper[] = [];
+    const clientLoadFunctions: ClientLoadFunctionWrapper[] = [];
+    const ssrState: SSRStateTree = {};
 
     let children = routerViews;
     let childState = ssrState;
 
-    for (const stack of stacks) {
+    for (const stack of layers) {
       this.resolveRouterViews(
         stack,
         true,
@@ -464,11 +477,11 @@ export default class Router {
         metaSetters,
         propSetters,
         keySetters,
-        beforeEnterHooks,
-        beforeLeaveHooks,
+        beforeEnterHandlers,
+        beforeLeaveHandlers,
         asyncComponentPromises,
-        serverLoadFns,
-        clientLoadFns,
+        serverLoadFunctions,
+        clientLoadFunctions,
         childState
       );
 
@@ -485,30 +498,30 @@ export default class Router {
       metaSetters,
       propSetters,
       keySetters,
-      beforeEnterHooks,
-      beforeLeaveHooks,
+      beforeEnterHandlers,
+      beforeLeaveHandlers,
       asyncComponentPromises,
-      serverLoadFns,
-      clientLoadFns,
+      serverLoadFunctions,
+      clientLoadFunctions,
       ssrState,
     };
   }
 
   private resolveRouterViews(
-    stack: RouterViewDef[],
+    stack: ViewConfig[],
     skipLastViewChildren: boolean,
-    routerViews: Record<string, RouterViewResolved>,
+    routerViews: Record<string, ResolvedView>,
     metaSetters: RouteProps[],
     propSetters: PropSetters,
-    keySetters: KeyFn[],
-    beforeEnterHooks: GuardHook[],
-    beforeLeaveHooks: GuardHook[],
+    keySetters: KeyFunction[],
+    beforeEnterHandlers: NavigationGuard[],
+    beforeLeaveHandlers: NavigationGuard[],
     asyncComponentPromises: Promise<SyncComponent>[],
-    serverLoadFns: ServerLoadFnWrapper[],
-    clientLoadFns: ClientLoadFnWrapper[],
-    ssrState: SSRState
+    serverLoadFunctions: ServerLoadFunctionWrapper[],
+    clientLoadFunctions: ClientLoadFunctionWrapper[],
+    ssrState: SSRStateTree
   ): void {
-    stack.forEach((routerViewDef) => {
+    stack.forEach((ViewConfig) => {
       const {
         name = "default",
         component,
@@ -518,15 +531,15 @@ export default class Router {
         beforeEnter,
         beforeLeave,
         children,
-      } = routerViewDef;
-      const routerView: RouterViewResolved = (routerViews[name] = { name });
+      } = ViewConfig;
+      const routerView: ResolvedView = (routerViews[name] = { name });
 
       if (beforeEnter) {
-        beforeEnterHooks.push(beforeEnter);
+        beforeEnterHandlers.push(beforeEnter);
       }
 
       if (beforeLeave) {
-        beforeLeaveHooks.push(beforeLeave);
+        beforeLeaveHandlers.push(beforeLeave);
       }
 
       if (meta) {
@@ -548,13 +561,13 @@ export default class Router {
       ssrState[name] = {};
 
       if (component) {
-        const pushLoadFn = (load: LoadFn, ssrState: SSRStateNode) => {
+        const pushLoadFn = (load: LoadFunction, ssrState: SSRStateNode) => {
           if (this.mode === "client") {
             if (
               load.callOnClient ||
               (load.callOnClient === undefined && this.callLoadOnClient)
             ) {
-              clientLoadFns.push(async (route) => {
+              clientLoadFunctions.push(async (route) => {
                 let key = "";
                 const props = routerView.props;
 
@@ -591,7 +604,7 @@ export default class Router {
               });
             }
           } else {
-            serverLoadFns.push(
+            serverLoadFunctions.push(
               async (route, ctx) =>
                 (ssrState.data = await load(routerView.props || {}, route, ctx))
             );
@@ -601,7 +614,7 @@ export default class Router {
         if (component instanceof Function && !component.prototype) {
           asyncComponentPromises.push(
             (<AsyncComponent>component)().then((component) => {
-              routerViewDef.component = routerView.component = component;
+              ViewConfig.component = routerView.component = component;
 
               if (component.load && ssrState) {
                 pushLoadFn(component.load, ssrState[name]);
@@ -614,7 +627,7 @@ export default class Router {
           routerView.component = <ComponentModule>component;
 
           if (routerView.component.beforeEnter) {
-            beforeEnterHooks.push(routerView.component.beforeEnter);
+            beforeEnterHandlers.push(routerView.component.beforeEnter);
           }
 
           if (routerView.component.load) {
@@ -625,37 +638,37 @@ export default class Router {
 
       if (
         children &&
-        (!skipLastViewChildren || routerViewDef !== stack[stack.length - 1])
+        (!skipLastViewChildren || ViewConfig !== stack[stack.length - 1])
       ) {
         routerView.children = {};
 
         this.resolveRouterViews(
           children.filter(
-            (v): v is RouterViewDef => !(v instanceof Array) && !v.path
+            (v): v is ViewConfig => !(v instanceof Array) && !v.path
           ),
           false,
           routerView.children,
           metaSetters,
           propSetters,
           keySetters,
-          beforeEnterHooks,
-          beforeLeaveHooks,
+          beforeEnterHandlers,
+          beforeLeaveHandlers,
           asyncComponentPromises,
-          serverLoadFns,
-          clientLoadFns,
+          serverLoadFunctions,
+          clientLoadFunctions,
           (ssrState[name].children = {})
         );
       }
     });
   }
 
-  private async runGuardHooks(
-    hooks: GuardHook[],
+  private async callNavigationGuards(
+    handlers: NavigationGuard[],
     to: Route,
     ssrContext: unknown
   ) {
-    for (const hook of hooks) {
-      const ret = await hook(to, this.current);
+    for (const handler of handlers) {
+      const ret = await handler(to, this.current);
 
       if (ret === true || ret === undefined) {
         continue;
@@ -793,37 +806,36 @@ export default class Router {
     return this.go(1, state);
   }
 
-  on(event: Events, handler: EventHooks[typeof event]): void {
+  on(event: Events, handler: EventHandlers[typeof event]): void {
     if (event === "beforeChange") {
-      this.beforeChangeHooks.push(handler);
+      this.beforeChangeHandlers.push(handler);
     } else if (event === "beforeCurrentRouteLeave") {
-      this.current?._beforeLeaveHooks.push(handler);
+      this.current?._beforeLeaveHandlers.push(handler);
     } else if (event === "update") {
-      this.updateHooks.push(handler);
+      this.updateHandlers.push(handler);
     } else if (event === "afterChange") {
-      this.afterChangeHooks.push(handler);
+      this.afterChangeHandlers.push(handler);
     }
   }
 
-  off(event: Events, handler: EventHooks[typeof event]): void {
+  off(event: Events, handler: EventHandlers[typeof event]): void {
     if (event === "beforeChange") {
-      this.beforeChangeHooks = this.beforeChangeHooks.filter(
+      this.beforeChangeHandlers = this.beforeChangeHandlers.filter(
         (fn) => fn !== handler
       );
     } else if (event === "beforeCurrentRouteLeave" && this.current) {
-      this.current._beforeLeaveHooks = this.current._beforeLeaveHooks.filter(
-        (fn) => fn !== handler
-      );
+      this.current._beforeLeaveHandlers =
+        this.current._beforeLeaveHandlers.filter((fn) => fn !== handler);
     } else if (event === "update") {
-      this.updateHooks = this.updateHooks.filter((fn) => fn !== handler);
+      this.updateHandlers = this.updateHandlers.filter((fn) => fn !== handler);
     } else if (event === "afterChange") {
-      this.afterChangeHooks = this.afterChangeHooks.filter(
+      this.afterChangeHandlers = this.afterChangeHandlers.filter(
         (fn) => fn !== handler
       );
     }
   }
 
-  once(event: Events, handler: EventHooks[typeof event]): void {
+  once(event: Events, handler: EventHandlers[typeof event]): void {
     const h: typeof handler = (...args: Parameters<typeof handler>) => {
       this.off(event, h);
       // @ts-expect-error A spread argument must either have a tuple type or be passed to a rest parameter. ts(2556)
@@ -835,9 +847,9 @@ export default class Router {
 
   private emit(event: string, to: Route, from?: Route) {
     if (event === "update") {
-      this.updateHooks.forEach((fn) => fn(to));
+      this.updateHandlers.forEach((fn) => fn(to));
     } else if (event === "afterChange") {
-      this.afterChangeHooks.forEach((fn) => fn(to, from));
+      this.afterChangeHandlers.forEach((fn) => fn(to, from));
     }
   }
 }
