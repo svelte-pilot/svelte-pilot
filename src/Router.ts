@@ -81,7 +81,7 @@ export type Route = {
   href: string;
   ssrState: SSRStateTree;
   _ssrStateMap: Map<LoadFunction, Record<string, Record<string, unknown>>>;
-  _routerViews: Record<string, ResolvedView>;
+  _views: Record<string, ResolvedView>;
   _beforeLeaveHandlers: NavigationGuard[];
   _metaSetters: RouteProps[];
   _propSetters: PropSetters;
@@ -226,7 +226,7 @@ export default class Router {
           result
         );
       } else if (viewConfig.path || viewConfig.children) {
-        const _stacks = [
+        const _layers = [
           ...layers,
           sideViewConfigArray
             .filter((v) => v.name !== viewConfig.name)
@@ -234,12 +234,12 @@ export default class Router {
         ];
 
         if (viewConfig.path) {
-          result[viewConfig.path] = _stacks;
+          result[viewConfig.path] = _layers;
         } else if (viewConfig.children) {
           this.toViewConfigLayers(
             viewConfig.children,
             sideViewConfigArray,
-            _stacks,
+            _layers,
             result
           );
         }
@@ -261,7 +261,7 @@ export default class Router {
     }
 
     const {
-      routerViews,
+      views,
       metaSetters,
       propSetters,
       keySetters,
@@ -271,7 +271,7 @@ export default class Router {
       serverLoadFunctions,
       clientLoadFunctions,
       ssrState,
-    } = this.resolveViewConfigGroup(matchedURLRoute.handler);
+    } = this.resolveViewConfigLayers(matchedURLRoute.handler);
 
     const route: Route = {
       ...loc,
@@ -279,7 +279,7 @@ export default class Router {
       meta: {},
       ssrState,
       _ssrStateMap: new Map(),
-      _routerViews: routerViews,
+      _views: views,
       _beforeLeaveHandlers: beforeLeaveHandlers,
       _metaSetters: metaSetters,
       _propSetters: propSetters,
@@ -326,18 +326,18 @@ export default class Router {
 
     if (this.ssrState) {
       const restore = (
-        ssrStateNode: SSRStateTree,
-        routerViews: Record<string, ResolvedView>
+        ssrState: SSRStateTree,
+        views: Record<string, ResolvedView>
       ) => {
-        Object.entries(ssrStateNode).forEach(([name, ssrStateNode]) => {
-          const routerView = routerViews[name];
+        Object.entries(ssrState).forEach(([name, ssrStateNode]) => {
+          const view = views[name];
 
           if (ssrStateNode.data) {
-            const load = (routerView.component as ComponentModule)
+            const load = (view.component as ComponentModule)
               .load as LoadFunction;
             const records = route._ssrStateMap.get(load) || {};
             let key = "";
-            const { props } = routerView;
+            const { props } = view;
 
             if (props) {
               if (load.watch) {
@@ -350,15 +350,15 @@ export default class Router {
             records[key] = ssrStateNode.data;
           }
 
-          if (ssrStateNode.children && routerView.children) {
-            restore(ssrStateNode.children, routerView.children);
+          if (ssrStateNode.children && view.children) {
+            restore(ssrStateNode.children, view.children);
           }
         });
       };
 
       route.ssrState = this.ssrState;
       this.ssrState = undefined;
-      restore(route.ssrState, route._routerViews);
+      restore(route.ssrState, route._views);
     } else {
       await Promise.all(clientLoadFunctions.map((fn) => fn(route)));
     }
@@ -387,7 +387,7 @@ export default class Router {
       hash: url.hash,
       state:
         typeof location === "string" || !location.state ? {} : location.state,
-      href: this.convertInternalUrlToHref(url),
+      href: this.toExternalUrl(url),
     };
   }
 
@@ -425,7 +425,7 @@ export default class Router {
     return url;
   }
 
-  private convertInternalUrlToHref(url: URL) {
+  private toExternalUrl(url: URL) {
     if (this.pathQuery) {
       const u = new URL(url.href);
 
@@ -451,11 +451,11 @@ export default class Router {
   }
 
   href(location: string | Location): string {
-    return this.convertInternalUrlToHref(this.locationToInternalURL(location));
+    return this.toExternalUrl(this.locationToInternalURL(location));
   }
 
-  private resolveViewConfigGroup(layers: ViewConfig[][]) {
-    const routerViews: Record<string, ResolvedView> = {};
+  private resolveViewConfigLayers(layers: ViewConfig[][]) {
+    const views: Record<string, ResolvedView> = {};
     const metaSetters: RouteProps[] = [];
     const propSetters: PropSetters = [];
     const keySetters: KeyFunction[] = [];
@@ -466,12 +466,12 @@ export default class Router {
     const clientLoadFunctions: ClientLoadFunctionWrapper[] = [];
     const ssrState: SSRStateTree = {};
 
-    let children = routerViews;
+    let children = views;
     let childState = ssrState;
 
-    for (const stack of layers) {
-      this.resolveRouterViews(
-        stack,
+    for (const layer of layers) {
+      this.resolveViewConfigLayer(
+        layer,
         true,
         children,
         metaSetters,
@@ -485,7 +485,7 @@ export default class Router {
         childState
       );
 
-      const linkViewName = stack[stack.length - 1].name || "default";
+      const linkViewName = layer[layer.length - 1].name || "default";
       children = children[linkViewName].children = {};
 
       if (childState) {
@@ -494,7 +494,7 @@ export default class Router {
     }
 
     return {
-      routerViews,
+      views,
       metaSetters,
       propSetters,
       keySetters,
@@ -507,10 +507,10 @@ export default class Router {
     };
   }
 
-  private resolveRouterViews(
-    stack: ViewConfig[],
+  private resolveViewConfigLayer(
+    layer: ViewConfig[],
     skipLastViewChildren: boolean,
-    routerViews: Record<string, ResolvedView>,
+    views: Record<string, ResolvedView>,
     metaSetters: RouteProps[],
     propSetters: PropSetters,
     keySetters: KeyFunction[],
@@ -521,7 +521,7 @@ export default class Router {
     clientLoadFunctions: ClientLoadFunctionWrapper[],
     ssrState: SSRStateTree
   ): void {
-    stack.forEach((ViewConfig) => {
+    layer.forEach((ViewConfig) => {
       const {
         name = "default",
         component,
@@ -532,7 +532,7 @@ export default class Router {
         beforeLeave,
         children,
       } = ViewConfig;
-      const routerView: ResolvedView = (routerViews[name] = { name });
+      const view: ResolvedView = (views[name] = { name });
 
       if (beforeEnter) {
         beforeEnterHandlers.push(beforeEnter);
@@ -548,14 +548,14 @@ export default class Router {
 
       if (props) {
         if (props instanceof Function) {
-          propSetters.push((route) => (routerView.props = props(route)));
+          propSetters.push((route) => (view.props = props(route)));
         } else {
-          routerView.props = props;
+          view.props = props;
         }
       }
 
       if (key) {
-        keySetters.push((route) => (routerView.key = key(route)));
+        keySetters.push((route) => (view.key = key(route)));
       }
 
       ssrState[name] = {};
@@ -569,7 +569,7 @@ export default class Router {
             ) {
               clientLoadFunctions.push(async (route) => {
                 let key = "";
-                const props = routerView.props;
+                const props = view.props;
 
                 if (props) {
                   key = JSON.stringify(
@@ -594,11 +594,7 @@ export default class Router {
                   setState(cache[key]);
                 } else {
                   setState(
-                    await load(
-                      routerView.props || {},
-                      route,
-                      this.mockedSSRContext
-                    )
+                    await load(view.props || {}, route, this.mockedSSRContext)
                   );
                 }
               });
@@ -606,7 +602,7 @@ export default class Router {
           } else {
             serverLoadFunctions.push(
               async (route, ctx) =>
-                (ssrState.data = await load(routerView.props || {}, route, ctx))
+                (ssrState.data = await load(view.props || {}, route, ctx))
             );
           }
         };
@@ -614,7 +610,7 @@ export default class Router {
         if (component instanceof Function && !component.prototype) {
           asyncComponentPromises.push(
             (<AsyncComponent>component)().then((component) => {
-              ViewConfig.component = routerView.component = component;
+              ViewConfig.component = view.component = component;
 
               if (component.load && ssrState) {
                 pushLoadFn(component.load, ssrState[name]);
@@ -624,30 +620,30 @@ export default class Router {
             })
           );
         } else {
-          routerView.component = <ComponentModule>component;
+          view.component = <ComponentModule>component;
 
-          if (routerView.component.beforeEnter) {
-            beforeEnterHandlers.push(routerView.component.beforeEnter);
+          if (view.component.beforeEnter) {
+            beforeEnterHandlers.push(view.component.beforeEnter);
           }
 
-          if (routerView.component.load) {
-            pushLoadFn(routerView.component.load, ssrState[name]);
+          if (view.component.load) {
+            pushLoadFn(view.component.load, ssrState[name]);
           }
         }
       }
 
       if (
         children &&
-        (!skipLastViewChildren || ViewConfig !== stack[stack.length - 1])
+        (!skipLastViewChildren || ViewConfig !== layer[layer.length - 1])
       ) {
-        routerView.children = {};
+        view.children = {};
 
-        this.resolveRouterViews(
+        this.resolveViewConfigLayer(
           children.filter(
             (v): v is ViewConfig => !(v instanceof Array) && !v.path
           ),
           false,
-          routerView.children,
+          view.children,
           metaSetters,
           propSetters,
           keySetters,

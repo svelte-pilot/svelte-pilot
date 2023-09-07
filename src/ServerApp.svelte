@@ -13,7 +13,7 @@
 
   setContext(CTX_CHILDREN, {
     subscribe: writable({
-      routerViews: route._routerViews,
+      views: route._views,
       ssrState: route.ssrState,
     }).subscribe,
   });

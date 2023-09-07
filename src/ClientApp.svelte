@@ -21,7 +21,7 @@
 
   function update(route: Route) {
     childrenStore.set({
-      routerViews: route._routerViews,
+      views: route._views,
       ssrState: route.ssrState,
     });
 

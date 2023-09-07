@@ -4,44 +4,42 @@
   import {
     ComponentModule,
     RouteProps,
-    RouterViewResolved,
-    SSRState,
+    ResolvedView,
+    SSRStateTree,
   } from "./Router";
   import { CTX_CHILDREN } from "./ctxKeys";
 
   export let name = "default";
 
   type Node = {
-    routerViews?: RouterViewResolved["children"];
-    ssrState?: SSRState;
+    views?: ResolvedView["children"];
+    ssrState?: SSRStateTree;
   };
 
-  let view: RouterViewResolved | undefined;
+  let view: ResolvedView | undefined;
   let component: typeof SvelteComponent | undefined;
   let props: RouteProps;
   const parentStore: Readable<Node> = getContext(CTX_CHILDREN);
   const childrenStore: Writable<Node> = writable();
   setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe });
 
-  const unsubscribe = parentStore.subscribe(
-    ({ routerViews, ssrState } = {}) => {
-      view = routerViews?.[name];
+  const unsubscribe = parentStore.subscribe(({ views, ssrState } = {}) => {
+    view = views?.[name];
 
-      component =
-        (view?.component as ComponentModule | undefined)?.default ||
-        (view?.component as typeof SvelteComponent | undefined);
+    component =
+      (view?.component as ComponentModule | undefined)?.default ||
+      (view?.component as typeof SvelteComponent | undefined);
 
-      props = {
-        ...view?.props,
-        ...ssrState?.[name].data,
-      };
+    props = {
+      ...view?.props,
+      ...ssrState?.[name].data,
+    };
 
-      childrenStore.set({
-        routerViews: view?.children,
-        ssrState: ssrState?.[name].children,
-      });
-    }
-  );
+    childrenStore.set({
+      views: view?.children,
+      ssrState: ssrState?.[name].children,
+    });
+  });
 
   onDestroy(unsubscribe);
 </script>
