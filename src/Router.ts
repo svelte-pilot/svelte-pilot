@@ -112,7 +112,6 @@ export type EventHandlers = {
 };
 
 export type Mode = "server" | "client";
-type RouterLinkMethod = "push" | "replace" | "href";
 
 const detectedMode =
   typeof window !== "undefined" && window === globalThis && window.history
@@ -146,7 +145,6 @@ export default class Router {
   callLoadOnClient: boolean;
   ssrState?: SSRStateTree;
   current?: Route;
-  routerLinkDefaultMethod: RouterLinkMethod = "push";
   private urlRouter: URLRouter<ViewConfig[][]>;
   private beforeChangeHandlers: NavigationGuard[] = [];
   private afterChangeHandlers: SimpleHandler[] = [];
@@ -158,21 +156,19 @@ export default class Router {
     base = "",
     pathQuery = "",
     mode = detectedMode,
-    processInitialURL = true,
+    handleInitialURL = true,
     mockedSSRContext,
     callLoadOnClient = Boolean(mockedSSRContext),
     ssrState,
-    routerLinkDefaultMethod = "push",
   }: {
     routes: ViewConfigGroup;
     base?: string;
     pathQuery?: string;
     mode?: Mode;
-    processInitialURL?: boolean;
+    handleInitialURL?: boolean;
     mockedSSRContext?: unknown;
     callLoadOnClient?: boolean;
     ssrState?: SSRStateTree;
-    routerLinkDefaultMethod?: RouterLinkMethod;
   }) {
     this.urlRouter = new URLRouter(this.toViewConfigLayers(routes));
     this.base = base;
@@ -182,7 +178,6 @@ export default class Router {
     this.mockedSSRContext = mockedSSRContext;
     this.callLoadOnClient = callLoadOnClient;
     this.ssrState = ssrState;
-    this.routerLinkDefaultMethod = routerLinkDefaultMethod;
 
     if (this.mode === "client") {
       window.addEventListener("popstate", this.onPopStateWrapper);
@@ -191,7 +186,7 @@ export default class Router {
         history.replaceState({ __position__: history.length }, "");
       }
 
-      if (processInitialURL) {
+      if (handleInitialURL) {
         this.replace({
           path: location.href,
           state: history.state,

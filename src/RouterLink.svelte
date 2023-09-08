@@ -1,3 +1,12 @@
+<script lang="ts" context="module">
+  type Method = "push" | "replace" | null;
+  let defaultMethod: Method = "push";
+
+  export function setDefaultMethod(method: Method) {
+    defaultMethod = method;
+  }
+</script>
+
 <script lang="ts">
   import isEqual from "lodash-es/isEqual";
   import { getContext } from "svelte";
@@ -12,14 +21,13 @@
 
   export { className as class };
   export let to: string | Location;
-  export let method: "push" | "replace" | "href" =
-    router.routerLinkDefaultMethod;
+  export let method: Method = defaultMethod;
 
   $: loc = router.parseLocation(to);
   $: active = loc.path === $route.path;
 
   function onClick(e: Event) {
-    if (method === "href") {
+    if (method === null) {
       return;
     }
 
