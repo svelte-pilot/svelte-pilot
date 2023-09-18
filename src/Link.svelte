@@ -1,32 +1,64 @@
-<script lang="ts" context="module">
-  type Method = "push" | "replace" | null;
-  let defaultMethod: Method = "push";
+<script context="module">
+  /**
+   * @typedef {"push" | "replace" | null} Method
+   */
 
-  export function setDefaultMethod(method: Method) {
+  /**
+   * @type {Method}
+   */
+  let defaultMethod = "push";
+
+  /**
+   * @param {Method} method
+   */
+  export function setDefaultMethod(method) {
     defaultMethod = method;
   }
 </script>
 
-<script lang="ts">
+<script>
   import isEqual from "lodash-es/isEqual";
   import { getContext } from "svelte";
-  import { Writable } from "svelte/store";
-  import { Location, Route, default as Router } from "./Router";
   import { CTX_ROUTE, CTX_ROUTER } from "./ctxKeys";
+
+  /**
+   * @typedef {import("svelte/store").Writable} Writable")}
+   * @typedef {import("./Router").Location} Location
+   * @typedef {import("./Router").Route} Route
+   * @typedef {import("./Router").default} Router
+   */
 
   let className = "";
 
-  const router = getContext(CTX_ROUTER) as Router;
-  const route = getContext(CTX_ROUTE) as Writable<Route>;
+  /**
+   * @type {Router}
+   */
+  const router = getContext(CTX_ROUTER);
+
+  /**
+   * @type {Writable<Route>}
+   */
+  const route = getContext(CTX_ROUTE);
 
   export { className as class };
-  export let to: string | Location;
-  export let method: Method = defaultMethod;
+
+  /**
+   * @type {Location | string}
+   */
+  export let to;
+
+  /**
+   * @type {Method}
+   */
+  export let method = defaultMethod;
 
   $: loc = router.parseLocation(to);
   $: active = loc.path === $route.path;
 
-  function onClick(e: Event) {
+  /**
+   * @param {Event} e
+   */
+  function onClick(e) {
     if (method === null) {
       return;
     }

@@ -14,9 +14,9 @@ A Svelte router that supports Server-Side Rendering (SSR).
     - [Props from Path](#props-from-path)
     - [Catch-all Route](#catch-all-route)
     - [Nested Routes](#nested-routes)
-    - [Multiple `RouterView`s](#multiple-routerviews)
-    - [Override `RouterView`s](#override-routerviews)
-    - [Share Meta Data between `RouterView`s](#share-meta-data-between-routerviews)
+    - [Multiple views](#multiple-views)
+    - [Override views](#override-views)
+    - [Share Meta Data between views](#share-meta-data-between-views)
     - [Force Re-rendering](#force-re-rendering)
     - [`beforeEnter` Guard Hook](#beforeenter-guard-hook)
     - [`beforeLeave` Guard Hook](#beforeleave-guard-hook)
@@ -38,7 +38,7 @@ A Svelte router that supports Server-Side Rendering (SSR).
   - [query](#query-1)
   - [hash](#hash-1)
   - [state](#state-1)
-- [\<RouterLink\>](#routerlink)
+- [\<Link\>](#link)
   - [Props](#props)
 - [Properties](#properties)
   - [router.current](#routercurrent)
@@ -93,7 +93,7 @@ Check out [server-render.ts](https://github.com/jiangfengming/svelte-vite-ssr/bl
 A Svelte component can export a load function to fetch data on the server-side.
 
 The `load` function takes the following arguments:
-* `props`: The `props` defined in the RouterView configuration.
+* `props`: The `props` defined in the View configuration.
 * `route`: The current [Route](#route-object) object.
 * `ssrContext`: Anything passed to `router.handle()`.
 
@@ -158,7 +158,7 @@ const router = new Router({
 ```
 
 ### routes
-`RouterViewDefGroup`. Required. The route definitions.
+`ViewConfigGroup`. Required. The route configuration group.
 
 #### Simple Routes
 
@@ -286,20 +286,20 @@ const routes = [
 
 ```html
 <script>
-import { RouterView } from 'svelte-pilot';
+import { View } from 'svelte-pilot';
 </script>
 
 <nav>Navigation</nav>
 
 <main>
   <!-- Nested route component will be injected here -->
-  <RouterView />
+  <View />
 </main>
 
 <footer>Footer</footer>
 ```
 
-#### Multiple `RouterView`s
+#### Multiple views
 
 ```ts
 const routes = [
@@ -308,7 +308,7 @@ const routes = [
 
     children: [
       {
-        name: 'aside', // <---- paired with <RouterView name="aside" />
+        name: 'aside', // <---- paired with <View name="aside" />
         component: () => import('./views/Aside.svelte')
       },
 
@@ -325,19 +325,19 @@ const routes = [
 
 ```html
 <script>
-  import { RouterView } from 'svelte-pilot';
+  import { View } from 'svelte-pilot';
 </script>
 
 <aside>
-  <RouterView name="aside" />
+  <View name="aside" />
 </aside>
 
 <main>
-  <RouterView />
+  <View />
 </main>
 ```
 
-#### Override `RouterView`s
+#### Override views
 
 ```ts
 const routes = [
@@ -373,7 +373,7 @@ const routes = [
 ]
 ```
 
-#### Share Meta Data between `RouterView`s
+#### Share Meta Data between views
 
 ```ts
 const routes = [
@@ -404,7 +404,7 @@ const routes = [
 plain object.
 
 All meta objects will be merged together.
-If objects have a property with the same name, the nested RouterView's meta property will overwrite the outer ones.
+If objects have a property with the same name, the nested View's meta property will overwrite the outer ones.
 
 #### Force Re-rendering
 By default, when component is the same when route changes, the component will not be re-rendered.
@@ -435,7 +435,7 @@ const routes = [
 ```
 
 The `beforeEnter` hook is used to define a function that will be executed before a route transition occurs. When the
-navigation is triggered, the `beforeEnter` hook function in the incoming RouterView configurations will be triggered.
+navigation is triggered, the `beforeEnter` hook function in the incoming View configurations will be triggered.
 ##### Params:
 * `to`: The [Route](#route-object) object that will be changed to.
 * `from`: The current [Route](#route-object) object.
@@ -460,7 +460,7 @@ const routes = [
 ```
 
 the `beforeLeave` hook is used to define a function that will be executed before a route transition occurs. When the
-route is going to be changed, the `beforeLeave` hook function in the current RouterView configurations will be
+route is going to be changed, the `beforeLeave` hook function in the current View configurations will be
 triggered.
 
 The parameters and return value for the `beforeLeave` hook are the same as the `beforeEnter` hook.
@@ -560,7 +560,7 @@ Otherwise, it will contain the pathname, search, and hash.
 ### state
 `object`. [history.state](https://developer.mozilla.org/en-US/docs/Web/API/History/state) object.
 ### meta
-`object`. A plain object that is used to share information between RouterView configurations.
+`object`. A plain object that is used to share information between View configurations.
 
 
 ## Location Object
@@ -605,15 +605,15 @@ If a plain object is provided, its format is the same as the return value of the
 ### state
 `object`. The state object associated with the location.
 
-## \<RouterLink>
-`<RouterLink>` is a navigation component that renders an `<a>` element.
+## \<Link>
+`<Link>` is a navigation component that renders an `<a>` element.
 
 ```html
 <script>
-  import { RouterLink } from 'svelte-pilot';
+  import { Link } from 'svelte-pilot';
 </script>
 
-<RouterLink to={loaction} replace={true}>Link</RouterLink>
+<Link to={loaction} replace={true}>Link</Link>
 ```
 
 ### Props
@@ -622,7 +622,7 @@ If a plain object is provided, its format is the same as the return value of the
   
 Other props will be passed to the `<a>` element as is.
  
-The `<RouterLink>` component always has the `router-link` class. If the `to` location matches the current route's path,
+The `<Link>` component always has the `router-link` class. If the `to` location matches the current route's path,
 the `router-link-active` class is added to the component.
 
 ## Properties
@@ -756,10 +756,10 @@ type NormalHook = (to: Route, from?: Route) => void;
 
 #### Order of Hook Execution
 1. Navigation is triggered.
-2. `beforeLeave` hooks in the outgoing `RouterView` configurations are called.
+2. `beforeLeave` hooks in the outgoing `View` configurations are called.
 3. `beforeCurrentRouteLeave` hooks registered via `router.on('beforeCurrentRouteLeave', hook)` are called.
 4. `beforeChange` hooks registered via `router.on('beforeChange', hook)` are called.
-5. `beforeEnter` hooks in the incoming `RouterView` configurations and `beforeEnter` hooks exported from the context
+5. `beforeEnter` hooks in the incoming `View` configurations and `beforeEnter` hooks exported from the context
     module (`<script context="module">`) of sync Svelte components are called.
 6. `beforeEnter` hooks exported from the context module of async Svelte components are called.
 7. `update` hooks registered via `router.on('update', hook)` are called.

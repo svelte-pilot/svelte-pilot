@@ -19,10 +19,10 @@ export type PropSetters = Array<(route: Route) => Record<string, unknown>>;
 
 type SSRStateNode = {
   data?: Record<string, unknown>;
-  children?: SSRStateTree;
+  children?: SSRState;
 };
 
-export type SSRStateTree = Record<string, SSRStateNode>;
+export type SSRState = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LoadFunction<Props = any, Ctx = any, Ret = any> = {
@@ -79,7 +79,7 @@ export type Route = {
   params: StringCaster;
   meta: Record<string, unknown>;
   href: string;
-  ssrState: SSRStateTree;
+  ssrState: SSRState;
   _ssrStateMap: Map<LoadFunction, Record<string, Record<string, unknown>>>;
   _views: Record<string, ResolvedView>;
   _beforeLeaveHandlers: NavigationGuard[];
@@ -143,7 +143,7 @@ export default class Router {
   pathQuery: string;
   mockedSSRContext?: unknown;
   callLoadOnClient: boolean;
-  ssrState?: SSRStateTree;
+  ssrState?: SSRState;
   current?: Route;
   private urlRouter: URLRouter<ViewConfig[][]>;
   private beforeChangeHandlers: NavigationGuard[] = [];
@@ -168,7 +168,7 @@ export default class Router {
     handleInitialURL?: boolean;
     mockedSSRContext?: unknown;
     callLoadOnClient?: boolean;
-    ssrState?: SSRStateTree;
+    ssrState?: SSRState;
   }) {
     this.urlRouter = new URLRouter(this.toViewConfigLayers(routes));
     this.base = base;
@@ -321,7 +321,7 @@ export default class Router {
 
     if (this.ssrState) {
       const restore = (
-        ssrState: SSRStateTree,
+        ssrState: SSRState,
         views: Record<string, ResolvedView>
       ) => {
         Object.entries(ssrState).forEach(([name, ssrStateNode]) => {
@@ -459,7 +459,7 @@ export default class Router {
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
     const serverLoadFunctions: ServerLoadFunctionWrapper[] = [];
     const clientLoadFunctions: ClientLoadFunctionWrapper[] = [];
-    const ssrState: SSRStateTree = {};
+    const ssrState: SSRState = {};
 
     let children = views;
     let childState = ssrState;
@@ -514,7 +514,7 @@ export default class Router {
     asyncComponentPromises: Promise<SyncComponent>[],
     serverLoadFunctions: ServerLoadFunctionWrapper[],
     clientLoadFunctions: ClientLoadFunctionWrapper[],
-    ssrState: SSRStateTree
+    ssrState: SSRState
   ): void {
     layer.forEach((ViewConfig) => {
       const {
