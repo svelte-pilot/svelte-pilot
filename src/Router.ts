@@ -27,7 +27,7 @@ export type SSRState = Record<string, SSRStateNode>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LoadFunction<Props = any, Ctx = any, Ret = any> = {
   (props: Props, route: Route, ssrContext: Ctx): Ret | Promise<Ret>;
-  watch?: string[];
+  cacheKey?: string[];
   callOnClient?: boolean;
 };
 
@@ -141,7 +141,7 @@ export default class Router {
   mode: Mode;
   base: string;
   pathQuery: string;
-  mockedSSRContext?: unknown;
+  clientLoadContext?: unknown;
   callLoadOnClient: boolean;
   ssrState?: SSRState;
   current?: Route;
@@ -157,8 +157,8 @@ export default class Router {
     pathQuery = "",
     mode = detectedMode,
     handleInitialURL = true,
-    mockedSSRContext,
-    callLoadOnClient = Boolean(mockedSSRContext),
+    clientLoadContext,
+    callLoadOnClient = Boolean(clientLoadContext),
     ssrState,
   }: {
     routes: ViewConfigGroup;
@@ -166,7 +166,7 @@ export default class Router {
     pathQuery?: string;
     mode?: Mode;
     handleInitialURL?: boolean;
-    mockedSSRContext?: unknown;
+    clientLoadContext?: unknown;
     callLoadOnClient?: boolean;
     ssrState?: SSRState;
   }) {
@@ -175,7 +175,7 @@ export default class Router {
     this.pathQuery = pathQuery;
     this.mode = mode;
     this.onPopStateWrapper = () => this.onPopState();
-    this.mockedSSRContext = mockedSSRContext;
+    this.clientLoadContext = clientLoadContext;
     this.callLoadOnClient = callLoadOnClient;
     this.ssrState = ssrState;
 
@@ -335,8 +335,8 @@ export default class Router {
             const { props } = view;
 
             if (props) {
-              if (load.watch) {
-                key = JSON.stringify(load.watch.map((k) => props[k]));
+              if (load.cacheKey) {
+                key = JSON.stringify(load.cacheKey.map((k) => props[k]));
               } else {
                 key = JSON.stringify(Object.values(props));
               }
@@ -568,7 +568,7 @@ export default class Router {
 
                 if (props) {
                   key = JSON.stringify(
-                    load.watch?.map((k) => props[k]) || Object.values(props)
+                    load.cacheKey?.map((k) => props[k]) || Object.values(props)
                   );
                 }
 
@@ -589,7 +589,7 @@ export default class Router {
                   setState(cache[key]);
                 } else {
                   setState(
-                    await load(view.props || {}, route, this.mockedSSRContext)
+                    await load(view.props || {}, route, this.clientLoadContext)
                   );
                 }
               });
