@@ -250,11 +250,11 @@ export default class Router {
   async handleServer(
     location: string | Location,
     loadFunctionContext?: unknown
-  ): Promise<Route | null> {
+  ): Promise<Route | undefined> {
     const _route = this.findRoute(location);
 
     if (!_route) {
-      return null;
+      return;
     }
 
     const { route, asyncComponentPromises, serverLoadFunctions } = _route;
@@ -269,11 +269,11 @@ export default class Router {
 
   async handleClient(
     location: string | Location
-  ): Promise<Route | null | false> {
+  ): Promise<Route | undefined | false> {
     const _route = this.findRoute(location);
 
     if (!_route) {
-      return null;
+      return;
     }
 
     const {
@@ -359,7 +359,7 @@ export default class Router {
     const matchedURLRoute = this.urlRouter.find(loc.path);
 
     if (!matchedURLRoute) {
-      return null;
+      return;
     }
 
     const {
