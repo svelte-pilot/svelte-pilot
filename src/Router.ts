@@ -26,12 +26,15 @@ export type SSRState = Record<string, SSRStateNode>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LoadFunction<Props = any, Ctx = any, Ret = any> = {
-  (props: Props, route: Route, ssrContext: Ctx): Ret | Promise<Ret>;
+  (props: Props, route: Route, loadFunctionContext: Ctx): Ret | Promise<Ret>;
   cacheKey?: string[];
   callOnClient?: boolean;
 };
 
-type ServerLoadFunctionWrapper = (route: Route, ssrContext?: unknown) => void;
+type ServerLoadFunctionWrapper = (
+  route: Route,
+  loadFunctionContext?: unknown
+) => void;
 type ClientLoadFunctionWrapper = (route: Route) => void;
 
 export type KeyFunction = (route: Route) => PrimitiveType;
@@ -187,7 +190,7 @@ export default class Router {
       }
 
       if (handleInitialURL) {
-        this.replace({
+        this.handleClient({
           path: location.href,
           state: history.state,
         });
@@ -244,10 +247,114 @@ export default class Router {
     return result;
   }
 
-  async handle(
+  async handleServer(
     location: string | Location,
-    ssrContext?: unknown
+    loadFunctionContext?: unknown
+  ): Promise<Route | null> {
+    const _route = this.findRoute(location);
+
+    if (!_route) {
+      return null;
+    }
+
+    const { route, asyncComponentPromises, serverLoadFunctions } = _route;
+    await Promise.all(asyncComponentPromises);
+
+    await Promise.all(
+      serverLoadFunctions.map((fn) => fn(route, loadFunctionContext))
+    );
+
+    return route;
+  }
+
+  async handleClient(
+    location: string | Location
   ): Promise<Route | null | false> {
+    const _route = this.findRoute(location);
+
+    if (!_route) {
+      return null;
+    }
+
+    const {
+      route,
+      beforeEnterHandlers,
+      asyncComponentPromises,
+      clientLoadFunctions,
+    } = _route;
+
+    let ret = await this.callNavigationGuards(
+      (this.current?._beforeLeaveHandlers || []).concat(
+        this.beforeChangeHandlers,
+        beforeEnterHandlers
+      ),
+      route
+    );
+
+    if (ret !== true) {
+      return ret;
+    }
+
+    const modules = await Promise.all(asyncComponentPromises);
+
+    ret = await this.callNavigationGuards(
+      modules
+        .filter((m): m is ComponentModule => "beforeEnter" in m)
+        .map((m) => <NavigationGuard>m.beforeEnter),
+      route
+    );
+
+    if (ret !== true) {
+      return ret;
+    }
+
+    if (!this.ssrState) {
+      await Promise.all(clientLoadFunctions.map((fn) => fn(route)));
+    } else {
+      const restore = (
+        ssrState: SSRState,
+        views: Record<string, ResolvedView>
+      ) => {
+        Object.entries(ssrState).forEach(([name, ssrStateNode]) => {
+          const view = views[name];
+
+          if (ssrStateNode.data) {
+            const load = (view.component as ComponentModule)
+              .load as LoadFunction;
+            const records = route._ssrStateMap.get(load) || {};
+            let key = "";
+            const { props } = view;
+
+            if (props) {
+              if (load.cacheKey) {
+                key = JSON.stringify(load.cacheKey.map((k) => props[k]));
+              } else {
+                key = JSON.stringify(Object.values(props));
+              }
+            }
+
+            records[key] = ssrStateNode.data;
+          }
+
+          if (ssrStateNode.children && view.children) {
+            restore(ssrStateNode.children, view.children);
+          }
+        });
+      };
+
+      route.ssrState = this.ssrState;
+      this.ssrState = undefined;
+      restore(route.ssrState, route._views);
+    }
+
+    const from = this.current;
+    this.current = route;
+    this.emit("update", route);
+    this.emit("afterChange", route, from);
+    return route;
+  }
+
+  findRoute(location: string | Location) {
     const loc = this.parseLocation(location);
     const matchedURLRoute = this.urlRouter.find(loc.path);
 
@@ -283,86 +390,13 @@ export default class Router {
 
     this.updateRoute(route);
 
-    if (this.mode === "client") {
-      const ret = await this.callNavigationGuards(
-        (this.current?._beforeLeaveHandlers || []).concat(
-          this.beforeChangeHandlers,
-          beforeEnterHandlers
-        ),
-        route,
-        ssrContext
-      );
-
-      if (ret !== true) {
-        return ret;
-      }
-    }
-
-    const modules = await Promise.all(asyncComponentPromises);
-
-    if (this.mode === "client") {
-      const ret = await this.callNavigationGuards(
-        modules
-          .filter((m): m is ComponentModule => "beforeEnter" in m)
-          .map((m) => <NavigationGuard>m.beforeEnter),
-        route,
-        ssrContext
-      );
-
-      if (ret !== true) {
-        return ret;
-      }
-    }
-
-    if (this.mode === "server") {
-      await Promise.all(serverLoadFunctions.map((fn) => fn(route, ssrContext)));
-      return route;
-    }
-
-    if (this.ssrState) {
-      const restore = (
-        ssrState: SSRState,
-        views: Record<string, ResolvedView>
-      ) => {
-        Object.entries(ssrState).forEach(([name, ssrStateNode]) => {
-          const view = views[name];
-
-          if (ssrStateNode.data) {
-            const load = (view.component as ComponentModule)
-              .load as LoadFunction;
-            const records = route._ssrStateMap.get(load) || {};
-            let key = "";
-            const { props } = view;
-
-            if (props) {
-              if (load.cacheKey) {
-                key = JSON.stringify(load.cacheKey.map((k) => props[k]));
-              } else {
-                key = JSON.stringify(Object.values(props));
-              }
-            }
-
-            records[key] = ssrStateNode.data;
-          }
-
-          if (ssrStateNode.children && view.children) {
-            restore(ssrStateNode.children, view.children);
-          }
-        });
-      };
-
-      route.ssrState = this.ssrState;
-      this.ssrState = undefined;
-      restore(route.ssrState, route._views);
-    } else {
-      await Promise.all(clientLoadFunctions.map((fn) => fn(route)));
-    }
-
-    const from = this.current;
-    this.current = route;
-    this.emit("update", route);
-    this.emit("afterChange", route, from);
-    return route;
+    return {
+      route,
+      beforeEnterHandlers,
+      asyncComponentPromises,
+      serverLoadFunctions,
+      clientLoadFunctions,
+    };
   }
 
   parseLocation(location: string | Location): {
@@ -653,11 +687,7 @@ export default class Router {
     });
   }
 
-  private async callNavigationGuards(
-    handlers: NavigationGuard[],
-    to: Route,
-    ssrContext: unknown
-  ) {
+  private async callNavigationGuards(handlers: NavigationGuard[], to: Route) {
     for (const handler of handlers) {
       const ret = await handler(to, this.current);
 
@@ -666,7 +696,7 @@ export default class Router {
       } else if (ret === false) {
         return false;
       } else if (ret) {
-        return this.handle(ret, ssrContext);
+        return this.handleClient(ret);
       }
     }
 
@@ -714,7 +744,7 @@ export default class Router {
   }
 
   async push(location: string | Location): Promise<void> {
-    const route = await this.handle(location);
+    const route = await this.handleClient(location);
 
     if (this.mode === "client" && route) {
       history.pushState(
@@ -729,7 +759,7 @@ export default class Router {
   }
 
   async replace(location: string | Location): Promise<void> {
-    const route = await this.handle(location);
+    const route = await this.handleClient(location);
 
     if (this.mode === "client" && route) {
       history.replaceState(
@@ -744,7 +774,7 @@ export default class Router {
   }
 
   private async onPopState(state?: Record<string, unknown>): Promise<void> {
-    const route = await this.handle({
+    const route = await this.handleClient({
       path: location.href,
       state: { ...history.state, ...state },
     });
