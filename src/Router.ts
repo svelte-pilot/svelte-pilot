@@ -98,7 +98,7 @@ export type NavigationGuard = (
   from?: Route
 ) => NavigationGuardResult | Promise<NavigationGuardResult>;
 
-export type SimpleHandler = (to: Route, from?: Route) => void;
+export type AfterChangeHandler = (to: Route, from?: Route) => void;
 export type UpdateHandler = (route: Route) => void;
 
 export type Events =
@@ -106,13 +106,6 @@ export type Events =
   | "beforeCurrentRouteLeave"
   | "update"
   | "afterChange";
-
-export type EventHandlers = {
-  beforeCurrentRouteLeave: NavigationGuard;
-  beforeChange: NavigationGuard;
-  update: UpdateHandler;
-  afterChange: SimpleHandler;
-};
 
 export type Mode = "server" | "client";
 
@@ -150,7 +143,7 @@ export default class Router {
   current?: Route;
   private urlRouter: URLRouter<ViewConfig[][]>;
   private beforeChangeHandlers: NavigationGuard[] = [];
-  private afterChangeHandlers: SimpleHandler[] = [];
+  private afterChangeHandlers: AfterChangeHandler[] = [];
   private updateHandlers: UpdateHandler[] = [];
   private onPopStateWrapper: () => void;
 
@@ -161,7 +154,7 @@ export default class Router {
     mode = detectedMode,
     handleInitialURL = true,
     clientLoadContext,
-    callLoadOnClient = Boolean(clientLoadContext),
+    callLoadOnClient = false,
     ssrState,
   }: {
     routes: ViewConfigGroup;
@@ -350,7 +343,7 @@ export default class Router {
     const from = this.current;
     this.current = route;
     this.emit("update", route);
-    this.emit("afterChange", route, from);
+    setTimeout(() => this.emit("afterChange", route, from));
     return route;
   }
 
@@ -827,7 +820,18 @@ export default class Router {
     return this.go(1, state);
   }
 
-  on(event: Events, handler: EventHandlers[typeof event]): void {
+  on(event: "beforeChange", handler: NavigationGuard): void;
+  on(event: "beforeCurrentRouteLeave", handler: NavigationGuard): void;
+  on(event: "update", handler: UpdateHandler): void;
+  on(event: "afterChange", handler: AfterChangeHandler): void;
+  on(
+    event: Events,
+    handler: NavigationGuard | UpdateHandler | AfterChangeHandler
+  ): void;
+  on(
+    event: Events,
+    handler: NavigationGuard | UpdateHandler | AfterChangeHandler
+  ): void {
     if (event === "beforeChange") {
       this.beforeChangeHandlers.push(handler);
     } else if (event === "beforeCurrentRouteLeave") {
@@ -839,7 +843,10 @@ export default class Router {
     }
   }
 
-  off(event: Events, handler: EventHandlers[typeof event]): void {
+  off(
+    event: Events,
+    handler: NavigationGuard | UpdateHandler | AfterChangeHandler
+  ): void {
     if (event === "beforeChange") {
       this.beforeChangeHandlers = this.beforeChangeHandlers.filter(
         (fn) => fn !== handler
@@ -856,10 +863,16 @@ export default class Router {
     }
   }
 
-  once(event: Events, handler: EventHandlers[typeof event]): void {
-    const h: typeof handler = (...args: Parameters<typeof handler>) => {
+  once(event: "beforeChange", handler: NavigationGuard): void;
+  once(event: "beforeCurrentRouteLeave", handler: NavigationGuard): void;
+  once(event: "update", handler: UpdateHandler): void;
+  once(event: "afterChange", handler: AfterChangeHandler): void;
+  once(
+    event: Events,
+    handler: NavigationGuard | UpdateHandler | AfterChangeHandler
+  ): void {
+    const h = (...args: [Route, Route?]) => {
       this.off(event, h);
-      // @ts-expect-error A spread argument must either have a tuple type or be passed to a rest parameter. ts(2556)
       handler(...args);
     };
 
