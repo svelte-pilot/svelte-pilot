@@ -4,9 +4,6 @@
   import { CTX_CHILDREN } from "./ctxKeys";
 
   /**
-   * @typedef {import("svelte").ComponentType} ComponentType
-   * @typedef {import("svelte/store").Readable} Readable
-   * @typedef {import("svelte/store").Writable} Writable
    * @typedef {import("./Router").ResolvedView} ResolvedView
    * @typedef {import("./Router").SSRState} SSRState
    * @typedef {import("./Router").RouteProps} RouteProps
@@ -21,7 +18,7 @@
   let view;
 
   /**
-   * @type {ComponentType | undefined}
+   * @type {import("svelte").ComponentType | undefined}
    */
   let component;
 
@@ -31,12 +28,12 @@
   let props;
 
   /**
-   * @type {Readable<Node>}
+   * @type {import("svelte/store").Readable<Node>}
    */
   const parentStore = getContext(CTX_CHILDREN);
 
   /**
-   * @type {Writable<Node>}
+   * @type {import("svelte/store").Writable<Node>}
    */
   const childrenStore = writable();
 
@@ -45,6 +42,7 @@
   const unsubscribe = parentStore.subscribe(({ views, ssrState } = {}) => {
     view = views?.[name];
 
+    // @ts-ignore
     component = view?.component?.default || view?.component;
 
     props = {

@@ -2,6 +2,7 @@
   "include": ["src/**/*"],
 
   "compilerOptions": {
+    "checkJs": true,
     "strict": true,
     "lib": ["ES2020", "DOM"],
     "target": "ES2020",

@@ -24,7 +24,6 @@ type SSRStateNode = {
 
 export type SSRState = Record<string, SSRStateNode>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LoadFunction<Props = any, Ctx = any, Ret = any> = {
   (props: Props, route: Route, loadFunctionContext: Ctx): Ret | Promise<Ret>;
   cacheKey?: string[];

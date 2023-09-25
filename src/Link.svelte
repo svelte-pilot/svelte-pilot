@@ -21,29 +21,22 @@
   import { getContext } from "svelte";
   import { CTX_ROUTE, CTX_ROUTER } from "./ctxKeys";
 
-  /**
-   * @typedef {import("svelte/store").Writable} Writable")}
-   * @typedef {import("./Router").Location} Location
-   * @typedef {import("./Router").Route} Route
-   * @typedef {import("./Router").default} Router
-   */
-
   let className = "";
 
   /**
-   * @type {Router}
+   * @type {import("./Router").default}
    */
   const router = getContext(CTX_ROUTER);
 
   /**
-   * @type {Writable<Route>}
+   * @type {import("svelte/store").Writable<import("./Router").Route>}
    */
   const route = getContext(CTX_ROUTE);
 
   export { className as class };
 
   /**
-   * @type {Location | string}
+   * @type {import("./Router").Location | string}
    */
   export let to;
 

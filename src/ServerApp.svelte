@@ -5,7 +5,7 @@
   import { CTX_CHILDREN, CTX_ROUTE, CTX_ROUTER } from "./ctxKeys";
 
   /**
-   * @type {import("./Router").default)}
+   * @type {import("./Router").default}
    */
   export let router;
 
