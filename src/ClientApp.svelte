@@ -1,13 +1,11 @@
-<script>
+<script lang="ts">
+  import Router, { Route } from "./Router";
   import { setContext } from "svelte";
   import { writable } from "svelte/store";
   import View from "./View.svelte";
   import { CTX_CHILDREN, CTX_ROUTE, CTX_ROUTER } from "./ctxKeys";
 
-  /**
-   * @type {import("./Router").default}
-   */
-  export let router;
+  export let router: Router;
 
   const childrenStore = writable();
   const routeStore = writable();
@@ -21,10 +19,7 @@
     update(router.current);
   }
 
-  /**
-   * @param {import("./Router").Route} route
-   */
-  function update(route) {
+  function update(route: Route) {
     childrenStore.set({
       views: route._views,
       ssrState: route.ssrState,

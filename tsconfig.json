@@ -2,12 +2,13 @@
   "include": ["src/**/*"],
 
   "compilerOptions": {
-    "checkJs": true,
     "strict": true,
-    "lib": ["ES2020", "DOM"],
-    "target": "ES2020",
-    "moduleResolution": "node",
+		"forceConsistentCasingInFileNames": true,
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
     "declaration": true,
+		"sourceMap": true,
+    "skipLibCheck": true,
     "outDir": "dist"
   }
 }

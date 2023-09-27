@@ -1,4 +1,5 @@
 dist
+.svelte-kit
 
 # Package lock files
 package-lock.json
