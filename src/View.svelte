@@ -20,9 +20,8 @@
     view = views?.[name];
 
     component =
-      view?.component && "default" in view.component
-        ? view.component.default
-        : (view?.component as ComponentType);
+      (view?.component as { default?: ComponentType })?.default ||
+      (view?.component as ComponentType);
 
     props = {
       ...view?.props,
