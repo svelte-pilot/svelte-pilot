@@ -1,40 +1,40 @@
 <script lang="ts">
-  import { getContext, onDestroy, setContext, ComponentType } from "svelte";
-  import { writable, Readable, Writable } from "svelte/store";
-  import { ResolvedView, SSRState, RouteProps } from "./Router";
-  import { CTX_CHILDREN } from "./ctxKeys";
+  import { getContext, onDestroy, setContext, ComponentType } from 'svelte'
+  import { writable, Readable, Writable } from 'svelte/store'
+  import { ResolvedView, SSRState, RouteProps } from './Router'
+  import { CTX_CHILDREN } from './ctxKeys'
 
-  type Node = { views?: ResolvedView["children"]; ssrState?: SSRState };
+  type Node = { views?: ResolvedView['children']; ssrState?: SSRState }
 
-  export let name = "default";
+  export let name = 'default'
 
-  let view: ResolvedView | undefined;
-  let component: ComponentType | undefined;
-  let props: RouteProps;
-  const parentStore: Readable<Node> = getContext(CTX_CHILDREN);
-  const childrenStore: Writable<Node> = writable();
+  let view: ResolvedView | undefined
+  let component: ComponentType | undefined
+  let props: RouteProps
+  const parentStore: Readable<Node> = getContext(CTX_CHILDREN)
+  const childrenStore: Writable<Node> = writable()
 
-  setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe });
+  setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe })
 
   const unsubscribe = parentStore.subscribe(({ views, ssrState } = {}) => {
-    view = views?.[name];
+    view = views?.[name]
 
     component =
       (view?.component as { default?: ComponentType })?.default ||
-      (view?.component as ComponentType);
+      (view?.component as ComponentType)
 
     props = {
       ...view?.props,
-      ...ssrState?.[name].data,
-    };
+      ...ssrState?.[name].data
+    }
 
     childrenStore.set({
       views: view?.children,
-      ssrState: ssrState?.[name].children,
-    });
-  });
+      ssrState: ssrState?.[name].children
+    })
+  })
 
-  onDestroy(unsubscribe);
+  onDestroy(unsubscribe)
 </script>
 
 {#if view && component}
