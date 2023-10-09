@@ -158,44 +158,6 @@ export default class Router {
     this.callLoadOnClient = callLoadOnClient;
   }
 
-  startClient({
-    clientLoadContext,
-    ssrState,
-    path,
-    ready,
-  }: {
-    clientLoadContext?: unknown;
-    ssrState?: SSRState;
-    path?: string | Location;
-    ready: () => void;
-  }) {
-    this.clientLoadContext = clientLoadContext;
-    window.addEventListener("popstate", this.onPopStateWrapper);
-
-    if (!history.state?.__position__) {
-      history.replaceState({ __position__: history.length }, "");
-    }
-
-    if (ssrState) {
-      this.handleClient(
-        path || { path: location.href, state: history.state },
-        ssrState
-      );
-      this.once("update", ready);
-    } else {
-      if (path) {
-        this.handleClient(path);
-      } else {
-        this.replace({
-          path: location.href,
-          state: history.state,
-        });
-      }
-
-      ready();
-    }
-  }
-
   private toViewConfigLayers(
     viewConfigGroup: ViewConfigGroup,
     sideViewConfigArray: ViewConfig[] = [],
@@ -751,6 +713,45 @@ export default class Router {
 
       this.updateRoute(this.current);
       this.emit("update", this.current);
+    }
+  }
+
+  start(
+    onReady: () => void,
+    {
+      clientLoadContext,
+      ssrState,
+      path,
+    }: {
+      clientLoadContext?: unknown;
+      ssrState?: SSRState;
+      path?: string | Location;
+    } = {}
+  ) {
+    this.clientLoadContext = clientLoadContext;
+    window.addEventListener("popstate", this.onPopStateWrapper);
+
+    if (!history.state?.__position__) {
+      history.replaceState({ __position__: history.length }, "");
+    }
+
+    if (ssrState) {
+      this.handleClient(
+        path || { path: location.href, state: history.state },
+        ssrState
+      );
+      this.once("update", onReady);
+    } else {
+      if (path) {
+        this.handleClient(path);
+      } else {
+        this.replace({
+          path: location.href,
+          state: history.state,
+        });
+      }
+
+      onReady();
     }
   }
 
