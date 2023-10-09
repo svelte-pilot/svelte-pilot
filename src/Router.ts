@@ -128,7 +128,7 @@ function appendSearchParams(
 export default class Router {
   base: string
   pathQuery: string
-  clientLoadContext?: unknown
+  clientContext?: unknown
   callLoadOnClient: boolean
   current?: Route
   private urlRouter: URLRouter<ViewConfig[][]>
@@ -141,20 +141,20 @@ export default class Router {
     routes,
     base = '',
     pathQuery = '',
-    clientLoadContext,
+    clientContext,
     callLoadOnClient = false
   }: {
     routes: ViewConfigGroup
     base?: string
     pathQuery?: string
-    clientLoadContext?: unknown
+    clientContext?: unknown
     callLoadOnClient?: boolean
   }) {
     this.urlRouter = new URLRouter(this.toViewConfigLayers(routes))
     this.base = base
     this.pathQuery = pathQuery
     this.onPopStateWrapper = () => this.onPopState()
-    this.clientLoadContext = clientLoadContext
+    this.clientContext = clientContext
     this.callLoadOnClient = callLoadOnClient
   }
 
@@ -597,7 +597,7 @@ export default class Router {
                   setState(cache[key])
                 } else {
                   setState(
-                    await load(view.props || {}, route, this.clientLoadContext)
+                    await load(view.props || {}, route, this.clientContext)
                   )
                 }
               })
@@ -714,16 +714,16 @@ export default class Router {
   start(
     onReady: () => void,
     {
-      clientLoadContext,
+      clientContext,
       ssrState,
       path
     }: {
-      clientLoadContext?: unknown
+      clientContext?: unknown
       ssrState?: SSRState
       path?: string | Location
     } = {}
   ) {
-    this.clientLoadContext = clientLoadContext
+    this.clientContext = clientContext
     window.addEventListener('popstate', this.onPopStateWrapper)
 
     if (!history.state?.__position__) {
