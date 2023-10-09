@@ -106,13 +106,6 @@ export type Events =
   | "update"
   | "afterChange";
 
-export type Mode = "server" | "client";
-
-const detectedMode =
-  typeof window !== "undefined" && window === globalThis && window.history
-    ? "client"
-    : "server";
-
 function appendSearchParams(
   searchParams: URLSearchParams,
   q: QueryParams
@@ -133,12 +126,10 @@ function appendSearchParams(
 }
 
 export default class Router {
-  mode: Mode;
   base: string;
   pathQuery: string;
   clientLoadContext?: unknown;
   callLoadOnClient: boolean;
-  ssrState?: SSRState;
   current?: Route;
   private urlRouter: URLRouter<ViewConfig[][]>;
   private beforeChangeHandlers: NavigationGuard[] = [];
@@ -150,43 +141,58 @@ export default class Router {
     routes,
     base = "",
     pathQuery = "",
-    mode = detectedMode,
-    handleInitialURL = true,
     clientLoadContext,
     callLoadOnClient = false,
-    ssrState,
   }: {
     routes: ViewConfigGroup;
     base?: string;
     pathQuery?: string;
-    mode?: Mode;
-    handleInitialURL?: boolean;
     clientLoadContext?: unknown;
     callLoadOnClient?: boolean;
-    ssrState?: SSRState;
   }) {
     this.urlRouter = new URLRouter(this.toViewConfigLayers(routes));
     this.base = base;
     this.pathQuery = pathQuery;
-    this.mode = mode;
     this.onPopStateWrapper = () => this.onPopState();
     this.clientLoadContext = clientLoadContext;
     this.callLoadOnClient = callLoadOnClient;
-    this.ssrState = ssrState;
+  }
 
-    if (this.mode === "client") {
-      window.addEventListener("popstate", this.onPopStateWrapper);
+  startClient({
+    clientLoadContext,
+    ssrState,
+    path,
+    ready,
+  }: {
+    clientLoadContext?: unknown;
+    ssrState?: SSRState;
+    path?: string | Location;
+    ready: () => void;
+  }) {
+    this.clientLoadContext = clientLoadContext;
+    window.addEventListener("popstate", this.onPopStateWrapper);
 
-      if (!history.state?.__position__) {
-        history.replaceState({ __position__: history.length }, "");
-      }
+    if (!history.state?.__position__) {
+      history.replaceState({ __position__: history.length }, "");
+    }
 
-      if (handleInitialURL) {
-        this.handleClient({
+    if (ssrState) {
+      this.handleClient(
+        path || { path: location.href, state: history.state },
+        ssrState
+      );
+      this.once("update", ready);
+    } else {
+      if (path) {
+        this.handleClient(path);
+      } else {
+        this.replace({
           path: location.href,
           state: history.state,
         });
       }
+
+      ready();
     }
   }
 
@@ -243,13 +249,14 @@ export default class Router {
     location: string | Location,
     loadFunctionContext?: unknown
   ): Promise<Route | undefined> {
-    const _route = this.findRoute(location);
+    const serverLoadFunctions: ServerLoadFunctionWrapper[] = [];
+    const _route = this.findRoute(location, { serverLoadFunctions });
 
     if (!_route) {
       return;
     }
 
-    const { route, asyncComponentPromises, serverLoadFunctions } = _route;
+    const { route, asyncComponentPromises } = _route;
     await Promise.all(asyncComponentPromises);
 
     await Promise.all(
@@ -260,20 +267,17 @@ export default class Router {
   }
 
   async handleClient(
-    location: string | Location
+    location: string | Location,
+    ssrState?: SSRState
   ): Promise<Route | undefined | false> {
-    const _route = this.findRoute(location);
+    const clientLoadFunctions: ClientLoadFunctionWrapper[] = [];
+    const _route = this.findRoute(location, { clientLoadFunctions });
 
     if (!_route) {
       return;
     }
 
-    const {
-      route,
-      beforeEnterHandlers,
-      asyncComponentPromises,
-      clientLoadFunctions,
-    } = _route;
+    const { route, beforeEnterHandlers, asyncComponentPromises } = _route;
 
     let ret = await this.callNavigationGuards(
       (this.current?._beforeLeaveHandlers || []).concat(
@@ -300,7 +304,7 @@ export default class Router {
       return ret;
     }
 
-    if (!this.ssrState) {
+    if (!ssrState) {
       await Promise.all(clientLoadFunctions.map((fn) => fn(route)));
     } else {
       const restore = (
@@ -334,8 +338,7 @@ export default class Router {
         });
       };
 
-      route.ssrState = this.ssrState;
-      this.ssrState = undefined;
+      route.ssrState = ssrState;
       restore(route.ssrState, route._views);
     }
 
@@ -346,7 +349,16 @@ export default class Router {
     return route;
   }
 
-  findRoute(location: string | Location) {
+  findRoute(
+    location: string | Location,
+    {
+      serverLoadFunctions,
+      clientLoadFunctions,
+    }: {
+      serverLoadFunctions?: ServerLoadFunctionWrapper[];
+      clientLoadFunctions?: ClientLoadFunctionWrapper[];
+    }
+  ) {
     const loc = this.parseLocation(location);
     const matchedURLRoute = this.urlRouter.find(loc.path);
 
@@ -362,10 +374,11 @@ export default class Router {
       beforeEnterHandlers,
       beforeLeaveHandlers,
       asyncComponentPromises,
+      ssrState,
+    } = this.resolveViewConfigLayers(matchedURLRoute.handler, {
       serverLoadFunctions,
       clientLoadFunctions,
-      ssrState,
-    } = this.resolveViewConfigLayers(matchedURLRoute.handler);
+    });
 
     const route: Route = {
       ...loc,
@@ -475,7 +488,16 @@ export default class Router {
     return this.toExternalUrl(this.locationToInternalURL(location));
   }
 
-  private resolveViewConfigLayers(layers: ViewConfig[][]) {
+  private resolveViewConfigLayers(
+    layers: ViewConfig[][],
+    {
+      serverLoadFunctions,
+      clientLoadFunctions,
+    }: {
+      serverLoadFunctions?: ServerLoadFunctionWrapper[];
+      clientLoadFunctions?: ClientLoadFunctionWrapper[];
+    }
+  ) {
     const views: Record<string, ResolvedView> = {};
     const metaSetters: RouteProps[] = [];
     const propSetters: PropSetters = [];
@@ -483,8 +505,6 @@ export default class Router {
     const beforeEnterHandlers: NavigationGuard[] = [];
     const beforeLeaveHandlers: NavigationGuard[] = [];
     const asyncComponentPromises: Promise<SyncComponent>[] = [];
-    const serverLoadFunctions: ServerLoadFunctionWrapper[] = [];
-    const clientLoadFunctions: ClientLoadFunctionWrapper[] = [];
     const ssrState: SSRState = {};
 
     let children = views;
@@ -501,9 +521,9 @@ export default class Router {
         beforeEnterHandlers,
         beforeLeaveHandlers,
         asyncComponentPromises,
+        childState,
         serverLoadFunctions,
-        clientLoadFunctions,
-        childState
+        clientLoadFunctions
       );
 
       const linkViewName = layer[layer.length - 1].name || "default";
@@ -522,9 +542,9 @@ export default class Router {
       beforeEnterHandlers,
       beforeLeaveHandlers,
       asyncComponentPromises,
+      ssrState,
       serverLoadFunctions,
       clientLoadFunctions,
-      ssrState,
     };
   }
 
@@ -538,9 +558,9 @@ export default class Router {
     beforeEnterHandlers: NavigationGuard[],
     beforeLeaveHandlers: NavigationGuard[],
     asyncComponentPromises: Promise<SyncComponent>[],
-    serverLoadFunctions: ServerLoadFunctionWrapper[],
-    clientLoadFunctions: ClientLoadFunctionWrapper[],
-    ssrState: SSRState
+    ssrState: SSRState,
+    serverLoadFunctions?: ServerLoadFunctionWrapper[],
+    clientLoadFunctions?: ClientLoadFunctionWrapper[]
   ): void {
     layer.forEach((ViewConfig) => {
       const {
@@ -583,7 +603,12 @@ export default class Router {
 
       if (component) {
         const pushLoadFn = (load: LoadFunction, ssrState: SSRStateNode) => {
-          if (this.mode === "client") {
+          if (serverLoadFunctions) {
+            serverLoadFunctions.push(
+              async (route, ctx) =>
+                (ssrState.data = await load(view.props || {}, route, ctx))
+            );
+          } else if (clientLoadFunctions) {
             if (
               load.callOnClient ||
               (load.callOnClient === undefined && this.callLoadOnClient)
@@ -620,11 +645,6 @@ export default class Router {
                 }
               });
             }
-          } else {
-            serverLoadFunctions.push(
-              async (route, ctx) =>
-                (ssrState.data = await load(view.props || {}, route, ctx))
-            );
           }
         };
 
@@ -658,6 +678,7 @@ export default class Router {
         (!skipLastViewChildren || ViewConfig !== layer[layer.length - 1])
       ) {
         view.children = {};
+        ssrState[name].children = {};
 
         this.resolveViewConfigLayer(
           children.filter(
@@ -671,9 +692,9 @@ export default class Router {
           beforeEnterHandlers,
           beforeLeaveHandlers,
           asyncComponentPromises,
+          ssrState[name].children,
           serverLoadFunctions,
-          clientLoadFunctions,
-          (ssrState[name].children = {})
+          clientLoadFunctions
         );
       }
     });
@@ -720,15 +741,13 @@ export default class Router {
     if (this.current) {
       Object.assign(this.current.state, state);
 
-      if (this.mode === "client") {
-        history.replaceState(
-          {
-            ...this.current.state,
-            __position__: history.state.__position__,
-          },
-          ""
-        );
-      }
+      history.replaceState(
+        {
+          ...this.current.state,
+          __position__: history.state.__position__,
+        },
+        ""
+      );
 
       this.updateRoute(this.current);
       this.emit("update", this.current);
@@ -738,7 +757,7 @@ export default class Router {
   async push(location: string | Location): Promise<void> {
     const route = await this.handleClient(location);
 
-    if (this.mode === "client" && route) {
+    if (route) {
       history.pushState(
         {
           ...route.state,
@@ -753,7 +772,7 @@ export default class Router {
   async replace(location: string | Location): Promise<void> {
     const route = await this.handleClient(location);
 
-    if (this.mode === "client" && route) {
+    if (route) {
       history.replaceState(
         {
           ...route.state,
