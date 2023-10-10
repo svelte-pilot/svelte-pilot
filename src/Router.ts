@@ -99,12 +99,20 @@ export type NavigationGuard = (
 
 export type AfterChangeHandler = (to: Route, from?: Route) => void
 export type UpdateHandler = (route: Route) => void
+export type Errorhandler = (error: unknown) => void
 
-export type Events =
+export type Event =
   | 'beforeChange'
   | 'beforeCurrentRouteLeave'
   | 'update'
   | 'afterChange'
+  | 'error'
+
+export type EventHandler =
+  | NavigationGuard
+  | UpdateHandler
+  | AfterChangeHandler
+  | Errorhandler
 
 function appendSearchParams(
   searchParams: URLSearchParams,
@@ -135,6 +143,7 @@ export default class Router {
   private beforeChangeHandlers: NavigationGuard[] = []
   private afterChangeHandlers: AfterChangeHandler[] = []
   private updateHandlers: UpdateHandler[] = []
+  private errorHandlers: Errorhandler[] = []
   private onPopStateWrapper: () => void
 
   constructor({
@@ -227,83 +236,88 @@ export default class Router {
     location: string | Location,
     ssrState?: SSRState
   ): Promise<Route | undefined | false> {
-    const clientLoadFunctions: ClientLoadFunctionWrapper[] = []
-    const _route = this.findRoute(location, { clientLoadFunctions })
+    try {
+      const clientLoadFunctions: ClientLoadFunctionWrapper[] = []
+      const _route = this.findRoute(location, { clientLoadFunctions })
 
-    if (!_route) {
-      return
-    }
-
-    const { route, beforeEnterHandlers, asyncComponentPromises } = _route
-
-    let ret = await this.callNavigationGuards(
-      (this.current?._beforeLeaveHandlers || []).concat(
-        this.beforeChangeHandlers,
-        beforeEnterHandlers
-      ),
-      route
-    )
-
-    if (ret !== true) {
-      return ret
-    }
-
-    const modules = await Promise.all(asyncComponentPromises)
-
-    ret = await this.callNavigationGuards(
-      modules
-        .filter((m): m is ComponentModule => 'beforeEnter' in m)
-        .map((m) => <NavigationGuard>m.beforeEnter),
-      route
-    )
-
-    if (ret !== true) {
-      return ret
-    }
-
-    if (!ssrState) {
-      await Promise.all(clientLoadFunctions.map((fn) => fn(route)))
-    } else {
-      const restore = (
-        ssrState: SSRState,
-        views: Record<string, ResolvedView>
-      ) => {
-        Object.entries(ssrState).forEach(([name, ssrStateNode]) => {
-          const view = views[name]
-
-          if (ssrStateNode.data) {
-            const load = (view.component as ComponentModule)
-              .load as LoadFunction
-            const records = route._ssrStateMap.get(load) || {}
-            let key = ''
-            const { props } = view
-
-            if (props) {
-              if (load.cacheKey) {
-                key = JSON.stringify(load.cacheKey.map((k) => props[k]))
-              } else {
-                key = JSON.stringify(Object.values(props))
-              }
-            }
-
-            records[key] = ssrStateNode.data
-          }
-
-          if (ssrStateNode.children && view.children) {
-            restore(ssrStateNode.children, view.children)
-          }
-        })
+      if (!_route) {
+        return
       }
 
-      route.ssrState = ssrState
-      restore(route.ssrState, route._views)
-    }
+      const { route, beforeEnterHandlers, asyncComponentPromises } = _route
 
-    const from = this.current
-    this.current = route
-    this.emit('update', route)
-    setTimeout(() => this.emit('afterChange', route, from))
-    return route
+      let ret = await this.callNavigationGuards(
+        (this.current?._beforeLeaveHandlers || []).concat(
+          this.beforeChangeHandlers,
+          beforeEnterHandlers
+        ),
+        route
+      )
+
+      if (ret !== true) {
+        return ret
+      }
+
+      const modules = await Promise.all(asyncComponentPromises)
+
+      ret = await this.callNavigationGuards(
+        modules
+          .filter((m): m is ComponentModule => 'beforeEnter' in m)
+          .map((m) => <NavigationGuard>m.beforeEnter),
+        route
+      )
+
+      if (ret !== true) {
+        return ret
+      }
+
+      if (!ssrState) {
+        await Promise.all(clientLoadFunctions.map((fn) => fn(route)))
+      } else {
+        const restore = (
+          ssrState: SSRState,
+          views: Record<string, ResolvedView>
+        ) => {
+          Object.entries(ssrState).forEach(([name, ssrStateNode]) => {
+            const view = views[name]
+
+            if (ssrStateNode.data) {
+              const load = (view.component as ComponentModule)
+                .load as LoadFunction
+              const records = route._ssrStateMap.get(load) || {}
+              let key = ''
+              const { props } = view
+
+              if (props) {
+                if (load.cacheKey) {
+                  key = JSON.stringify(load.cacheKey.map((k) => props[k]))
+                } else {
+                  key = JSON.stringify(Object.values(props))
+                }
+              }
+
+              records[key] = ssrStateNode.data
+            }
+
+            if (ssrStateNode.children && view.children) {
+              restore(ssrStateNode.children, view.children)
+            }
+          })
+        }
+
+        route.ssrState = ssrState
+        restore(route.ssrState, route._views)
+      }
+
+      const from = this.current
+      this.current = route
+      this.emit('update', route)
+      setTimeout(() => this.emit('afterChange', route, from))
+      return route
+    } catch (e) {
+      this.emit('error', e)
+      throw e
+    }
   }
 
   findRoute(
@@ -361,14 +375,9 @@ export default class Router {
     }
   }
 
-  parseLocation(location: string | Location): {
-    path: string
-    query: StringCaster
-    search: string
-    hash: string
-    state: Record<string, unknown>
-    href: string
-  } {
+  parseLocation(
+    location: string | Location
+  ): Pick<Route, 'path' | 'query' | 'search' | 'hash' | 'state' | 'href'> {
     const url = this.locationToInternalURL(location)
 
     return {
@@ -838,14 +847,9 @@ export default class Router {
   on(event: 'beforeCurrentRouteLeave', handler: NavigationGuard): void
   on(event: 'update', handler: UpdateHandler): void
   on(event: 'afterChange', handler: AfterChangeHandler): void
-  on(
-    event: Events,
-    handler: NavigationGuard | UpdateHandler | AfterChangeHandler
-  ): void
-  on(
-    event: Events,
-    handler: NavigationGuard | UpdateHandler | AfterChangeHandler
-  ): void {
+  on(event: 'error', handler: Errorhandler): void
+  on(event: Event, handler: EventHandler): void
+  on(event: Event, handler: EventHandler): void {
     if (event === 'beforeChange') {
       this.beforeChangeHandlers.push(handler)
     } else if (event === 'beforeCurrentRouteLeave') {
@@ -854,13 +858,12 @@ export default class Router {
       this.updateHandlers.push(handler)
     } else if (event === 'afterChange') {
       this.afterChangeHandlers.push(handler)
+    } else if (event === 'error') {
+      this.errorHandlers.push(handler as Errorhandler)
     }
   }
 
-  off(
-    event: Events,
-    handler: NavigationGuard | UpdateHandler | AfterChangeHandler
-  ): void {
+  off(event: Event, handler: EventHandler): void {
     if (event === 'beforeChange') {
       this.beforeChangeHandlers = this.beforeChangeHandlers.filter(
         (fn) => fn !== handler
@@ -874,6 +877,8 @@ export default class Router {
       this.afterChangeHandlers = this.afterChangeHandlers.filter(
         (fn) => fn !== handler
       )
+    } else if (event === 'error') {
+      this.errorHandlers = this.errorHandlers.filter((fn) => fn !== handler)
     }
   }
 
@@ -881,23 +886,27 @@ export default class Router {
   once(event: 'beforeCurrentRouteLeave', handler: NavigationGuard): void
   once(event: 'update', handler: UpdateHandler): void
   once(event: 'afterChange', handler: AfterChangeHandler): void
+  once(event: 'error', handler: Errorhandler): void
   once(
-    event: Events,
+    event: Event,
     handler: NavigationGuard | UpdateHandler | AfterChangeHandler
   ): void {
-    const h = (...args: [Route, Route?]) => {
+    const h = (...args: unknown[]) => {
       this.off(event, h)
+      // @ts-ignore
       handler(...args)
     }
 
     this.on(event, h)
   }
 
-  private emit(event: string, to: Route, from?: Route) {
+  private emit(event: string, ...args: unknown[]) {
     if (event === 'update') {
-      this.updateHandlers.forEach((fn) => fn(to))
+      this.updateHandlers.forEach((fn) => fn(...(<[Route]>args)))
     } else if (event === 'afterChange') {
-      this.afterChangeHandlers.forEach((fn) => fn(to, from))
+      this.afterChangeHandlers.forEach((fn) => fn(...(<[Route, Route]>args)))
+    } else if (event === 'error') {
+      this.errorHandlers.forEach((fn) => fn(...(<[unknown]>args)))
     }
   }
 }
