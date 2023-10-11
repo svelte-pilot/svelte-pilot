@@ -124,7 +124,7 @@ function appendSearchParams(
     Object.entries(q).forEach(([key, val]) => {
       if (val !== null && val !== undefined) {
         if (Array.isArray(val)) {
-          val.forEach((v) => searchParams.append(key, String(v)))
+          val.forEach(v => searchParams.append(key, String(v)))
         } else {
           searchParams.append(key, String(val))
         }
@@ -178,10 +178,10 @@ export default class Router {
       (v): v is ViewConfig => !Array.isArray(v) && !v.path
     )
 
-    const sideViewNames = sideViewsWithinGroup.map((v) => v.name)
+    const sideViewNames = sideViewsWithinGroup.map(v => v.name)
 
     sideViewConfigArray = sideViewConfigArray
-      .filter((v) => !sideViewNames.includes(v.name))
+      .filter(v => !sideViewNames.includes(v.name))
       .concat(sideViewsWithinGroup)
 
     for (const viewConfig of viewConfigGroup) {
@@ -191,7 +191,7 @@ export default class Router {
         const _layers = [
           ...layers,
           sideViewConfigArray
-            .filter((v) => v.name !== viewConfig.name)
+            .filter(v => v.name !== viewConfig.name)
             .concat(viewConfig)
         ]
 
@@ -226,7 +226,7 @@ export default class Router {
     await Promise.all(asyncComponentPromises)
 
     await Promise.all(
-      serverLoadFunctions.map((fn) => fn(route, loadFunctionContext))
+      serverLoadFunctions.map(fn => fn(route, loadFunctionContext))
     )
 
     return route
@@ -263,7 +263,7 @@ export default class Router {
       ret = await this.callNavigationGuards(
         modules
           .filter((m): m is ComponentModule => 'beforeEnter' in m)
-          .map((m) => <NavigationGuard>m.beforeEnter),
+          .map(m => <NavigationGuard>m.beforeEnter),
         route
       )
 
@@ -272,7 +272,7 @@ export default class Router {
       }
 
       if (!ssrState) {
-        await Promise.all(clientLoadFunctions.map((fn) => fn(route)))
+        await Promise.all(clientLoadFunctions.map(fn => fn(route)))
       } else {
         const restore = (
           ssrState: SSRState,
@@ -290,7 +290,7 @@ export default class Router {
 
               if (props) {
                 if (load.cacheKey) {
-                  key = JSON.stringify(load.cacheKey.map((k) => props[k]))
+                  key = JSON.stringify(load.cacheKey.map(k => props[k]))
                 } else {
                   key = JSON.stringify(Object.values(props))
                 }
@@ -315,8 +315,10 @@ export default class Router {
       setTimeout(() => this.emit('afterChange', route, from))
       return route
     } catch (e) {
-      this.emit('error', e)
-      throw e
+      if (e instanceof Error) {
+        this.emit('error', e)
+        throw e
+      }
     }
   }
 
@@ -528,7 +530,7 @@ export default class Router {
     serverLoadFunctions?: ServerLoadFunctionWrapper[],
     clientLoadFunctions?: ClientLoadFunctionWrapper[]
   ): void {
-    layer.forEach((ViewConfig) => {
+    layer.forEach(ViewConfig => {
       const {
         name = 'default',
         component,
@@ -555,14 +557,14 @@ export default class Router {
 
       if (props) {
         if (props instanceof Function) {
-          propSetters.push((route) => (view.props = props(route)))
+          propSetters.push(route => (view.props = props(route)))
         } else {
           view.props = props
         }
       }
 
       if (key) {
-        keySetters.push((route) => (view.key = key(route)))
+        keySetters.push(route => (view.key = key(route)))
       }
 
       ssrState[name] = {}
@@ -579,13 +581,13 @@ export default class Router {
               load.callOnClient ||
               (load.callOnClient === undefined && this.callLoadOnClient)
             ) {
-              clientLoadFunctions.push(async (route) => {
+              clientLoadFunctions.push(async route => {
                 let key = ''
                 const props = view.props
 
                 if (props) {
                   key = JSON.stringify(
-                    load.cacheKey?.map((k) => props[k]) || Object.values(props)
+                    load.cacheKey?.map(k => props[k]) || Object.values(props)
                   )
                 }
 
@@ -616,7 +618,7 @@ export default class Router {
 
         if (component instanceof Function && !component.prototype) {
           asyncComponentPromises.push(
-            (<AsyncComponent>component)().then((component) => {
+            (<AsyncComponent>component)().then(component => {
               ViewConfig.component = view.component = component
 
               if (component.load && ssrState) {
@@ -690,17 +692,17 @@ export default class Router {
 
   private updateRouteMeta(route: Route) {
     const meta: Record<string, unknown> = (route.meta = {})
-    route._metaSetters.forEach((v) =>
+    route._metaSetters.forEach(v =>
       Object.assign(meta, v instanceof Function ? v(route) : v)
     )
   }
 
   private updateRouteProps(route: Route) {
-    route._propSetters.forEach((fn) => fn(route))
+    route._propSetters.forEach(fn => fn(route))
   }
 
   private updateRouteKeys(route: Route) {
-    route._keySetters.forEach((fn) => fn(route))
+    route._keySetters.forEach(fn => fn(route))
   }
 
   setState(state: Record<string, unknown>): void {
@@ -866,19 +868,19 @@ export default class Router {
   off(event: Event, handler: EventHandler): void {
     if (event === 'beforeChange') {
       this.beforeChangeHandlers = this.beforeChangeHandlers.filter(
-        (fn) => fn !== handler
+        fn => fn !== handler
       )
     } else if (event === 'beforeCurrentRouteLeave' && this.current) {
       this.current._beforeLeaveHandlers =
-        this.current._beforeLeaveHandlers.filter((fn) => fn !== handler)
+        this.current._beforeLeaveHandlers.filter(fn => fn !== handler)
     } else if (event === 'update') {
-      this.updateHandlers = this.updateHandlers.filter((fn) => fn !== handler)
+      this.updateHandlers = this.updateHandlers.filter(fn => fn !== handler)
     } else if (event === 'afterChange') {
       this.afterChangeHandlers = this.afterChangeHandlers.filter(
-        (fn) => fn !== handler
+        fn => fn !== handler
       )
     } else if (event === 'error') {
-      this.errorHandlers = this.errorHandlers.filter((fn) => fn !== handler)
+      this.errorHandlers = this.errorHandlers.filter(fn => fn !== handler)
     }
   }
 
@@ -902,11 +904,11 @@ export default class Router {
 
   private emit(event: string, ...args: unknown[]) {
     if (event === 'update') {
-      this.updateHandlers.forEach((fn) => fn(...(<[Route]>args)))
+      this.updateHandlers.forEach(fn => fn(...(<[Route]>args)))
     } else if (event === 'afterChange') {
-      this.afterChangeHandlers.forEach((fn) => fn(...(<[Route, Route]>args)))
+      this.afterChangeHandlers.forEach(fn => fn(...(<[Route, Route]>args)))
     } else if (event === 'error') {
-      this.errorHandlers.forEach((fn) => fn(...(<[unknown]>args)))
+      this.errorHandlers.forEach(fn => fn(...(<[unknown]>args)))
     }
   }
 }
