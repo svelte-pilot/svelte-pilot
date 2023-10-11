@@ -895,7 +895,7 @@ export default class Router {
   ): void {
     const h = (...args: unknown[]) => {
       this.off(event, h)
-      // @ts-ignore
+      // @ts-expect-error A spread argument must either have a tuple type or be passed to a rest parameter. ts(2556)
       handler(...args)
     }
 
