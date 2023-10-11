@@ -134,7 +134,7 @@ export default {
    * arrowParens: "<always|avoid>"
    * default: "always"
    */
-  arrowParens: 'always',
+  arrowParens: 'avoid',
 
   /**
    * Range
