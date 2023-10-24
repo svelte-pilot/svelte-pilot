@@ -14,9 +14,11 @@ type ServerSideComponent = {
 export { default as ClientApp } from './ClientApp.svelte'
 export {
   default as Link,
-  setDefaultMethod as setLinkMethod
+  options as linkOptions,
+  setOptions as setLinkOptions
 } from './Link.svelte'
 export * from './Router'
 export { default as Router } from './Router'
 export { default as View } from './View.svelte'
+export * from './ctxKeys'
 export const ServerApp = (<unknown>_ServerApp) as ServerSideComponent

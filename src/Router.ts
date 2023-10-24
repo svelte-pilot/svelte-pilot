@@ -284,7 +284,9 @@ export default class Router {
             if (ssrStateNode.data) {
               const load = (view.component as ComponentModule)
                 .load as LoadFunction
-              const records = route._ssrStateMap.get(load) || {}
+
+              const records: Record<string, Record<string, unknown>> = {}
+              route._ssrStateMap.set(load, records)
               let key = ''
               const { props } = view
 

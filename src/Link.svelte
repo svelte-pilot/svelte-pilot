@@ -1,9 +1,20 @@
 <script lang="ts" context="module">
   type Method = 'push' | 'replace' | null
-  let defaultMethod: Method = 'push'
 
-  export function setDefaultMethod(method: Method) {
-    defaultMethod = method
+  type Options = {
+    method: Method
+    class: string
+    activeClass: string
+  }
+
+  export const options: Options = {
+    method: 'push',
+    class: 'router-link',
+    activeClass: 'router-link-active'
+  }
+
+  export function setOptions(opts: Partial<Options>) {
+    Object.assign(options, opts)
   }
 </script>
 
@@ -14,14 +25,15 @@
   import Router, { Route, Location } from './Router'
   import { CTX_ROUTE, CTX_ROUTER } from './ctxKeys'
 
-  let className = ''
+  let className = options.class
 
   const router: Router = getContext(CTX_ROUTER)
   const route: Writable<Route> = getContext(CTX_ROUTE)
 
   export { className as class }
+  export let activeClass = options.activeClass
   export let to: Location | string
-  export let method = defaultMethod
+  export let method = options.method
 
   $: loc = router.parseLocation(to)
   $: active = loc.path === $route.path
@@ -53,8 +65,7 @@
 
 <a
   href={loc.href}
-  class="router-link {className}"
-  class:router-link-active={active}
+  class="{className} {active ? activeClass : ''}"
   on:click
   on:click={onClick}
   {...$$restProps}
