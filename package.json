@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jiangfengming/svelte-pilot.git"
+    "url": "git+https://github.com/svelte-pilot/svelte-pilot.git"
   },
   "keywords": [
     "svelte",
@@ -23,9 +23,9 @@
   ],
   "author": "Jiang Fengming <jiangfengming87@gmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/jiangfengming/svelte-pilot#readme",
+  "homepage": "https://svelte-pilot.github.io/",
   "bugs": {
-    "url": "https://github.com/jiangfengming/svelte-pilot/issues"
+    "url": "https://github.com/svelte-pilot/svelte-pilot/issues"
   },
   "peerDependencies": {
     "svelte": "^4"
