@@ -775,6 +775,8 @@ export default class Router {
         '',
         route.href
       )
+
+      window.scrollTo(0, 0)
     }
   }
 
@@ -790,6 +792,8 @@ export default class Router {
         '',
         route.href
       )
+
+      window.scrollTo(0, 0)
     }
   }
 
