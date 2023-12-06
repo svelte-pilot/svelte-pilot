@@ -19,19 +19,21 @@
   const unsubscribe = parentStore.subscribe(({ views, ssrState } = {}) => {
     view = views?.[name]
 
-    component =
-      (view?.component as { default?: ComponentType })?.default ||
-      (view?.component as ComponentType)
+    if (view) {
+      component =
+        (view.component as { default?: ComponentType })?.default ||
+        (view.component as ComponentType)
 
-    props = {
-      ...view?.props,
-      ...ssrState?.[name].data
+      props = {
+        ...view.props,
+        ...ssrState?.[name].data
+      }
+
+      childrenStore.set({
+        views: view.children,
+        ssrState: ssrState?.[name].children
+      })
     }
-
-    childrenStore.set({
-      views: view?.children,
-      ssrState: ssrState?.[name].children
-    })
   })
 
   onDestroy(unsubscribe)
