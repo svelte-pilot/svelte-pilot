@@ -72,6 +72,11 @@ export type Location = {
   state?: Record<string, unknown>
 }
 
+export type ParsedLocation = Pick<
+  Route,
+  'path' | 'query' | 'search' | 'hash' | 'state' | 'href'
+>
+
 export type Route = {
   path: string
   query: StringCaster
@@ -324,6 +329,10 @@ export default class Router {
     }
   }
 
+  test(location: string | Location): boolean {
+    return Boolean(this.urlRouter.find(this.parseLocation(location).path))
+  }
+
   findRoute(
     location: string | Location,
     {
@@ -379,9 +388,7 @@ export default class Router {
     }
   }
 
-  parseLocation(
-    location: string | Location
-  ): Pick<Route, 'path' | 'query' | 'search' | 'hash' | 'state' | 'href'> {
+  parseLocation(location: string | Location): ParsedLocation {
     const url = this.locationToInternalURL(location)
 
     return {
@@ -417,8 +424,21 @@ export default class Router {
     // `base` and `pathQuery` only have an effect on absolute URLs.
     // Additionally, `base` and `pathQuery` are mutually exclusive.
     if (/^\w+:/.test(location.path)) {
-      if (this.base && url.pathname.startsWith(this.base)) {
-        url.pathname = url.pathname.slice(this.base.length)
+      if (this.base) {
+        const base = this.base.endsWith('/')
+          ? this.base.slice(0, -1)
+          : this.base
+
+        if (
+          url.pathname.startsWith(base) &&
+          [undefined, '/'].includes(url.pathname[base.length])
+        ) {
+          url.pathname = url.pathname.slice(this.base.length) || '/'
+        } else {
+          throw new Error(
+            `The base path "${this.base}" does not match the path "${location.path}".`
+          )
+        }
       } else if (this.pathQuery) {
         url.pathname = url.searchParams.get(this.pathQuery) || '/'
         url.searchParams.delete(this.pathQuery)
@@ -445,8 +465,8 @@ export default class Router {
           ? this.base.endsWith('/')
             ? this.base + url.pathname.slice(1)
             : url.pathname === '/'
-            ? this.base
-            : this.base + url.pathname
+              ? this.base
+              : this.base + url.pathname
           : url.pathname) +
         url.search +
         url.hash
