@@ -75,9 +75,9 @@
       if (!options.origin) {
         return true
       } else if (Array.isArray(options.origin)) {
-        return options.origin.some(o => to.startsWith(o))
+        return !options.origin.some(o => to.startsWith(o))
       } else {
-        return to.startsWith(options.origin)
+        return !to.startsWith(options.origin)
       }
     }
 
