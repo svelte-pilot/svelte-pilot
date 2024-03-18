@@ -72,7 +72,7 @@
 
   function isExternalUrl(to: Location | string): to is string {
     if (to.constructor === String && /\w+:/.test(to)) {
-      if (!options.origin) {
+      if (!options.origin?.length) {
         return true
       } else if (Array.isArray(options.origin)) {
         return !options.origin.some(o => to.startsWith(o))
