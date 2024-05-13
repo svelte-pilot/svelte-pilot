@@ -638,7 +638,7 @@ export default class Router {
           }
         }
 
-        if (component instanceof Function && !component.prototype) {
+        if (component instanceof Function && !component.length) {
           asyncComponentPromises.push(
             (<AsyncComponent>component)().then(component => {
               ViewConfig.component = view.component = component
