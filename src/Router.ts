@@ -500,7 +500,7 @@ export default class Router {
     let children = views
     let childState = ssrState
 
-    for (const layer of layers) {
+    layers.forEach((layer, i) => {
       this.resolveViewConfigLayer(
         layer,
         true,
@@ -516,13 +516,15 @@ export default class Router {
         clientLoadFunctions
       )
 
-      const linkViewName = layer[layer.length - 1].name || 'default'
-      children = children[linkViewName].children = {}
+      if (i !== layers.length - 1) {
+        const linkViewName = layer[layer.length - 1].name || 'default'
+        children = children[linkViewName].children = {}
 
-      if (childState) {
-        childState = childState[linkViewName].children = {}
+        if (childState) {
+          childState = childState[linkViewName].children = {}
+        }
       }
-    }
+    })
 
     return {
       views,
