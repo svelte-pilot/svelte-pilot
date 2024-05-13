@@ -667,22 +667,19 @@ export default class Router {
         children &&
         (!skipLastViewChildren || ViewConfig !== layer[layer.length - 1])
       ) {
-        view.children = {}
-        ssrState[name].children = {}
-
         this.resolveViewConfigLayer(
           children.filter(
             (v): v is ViewConfig => !(v instanceof Array) && !v.path
           ),
           false,
-          view.children,
+          (view.children = {}),
           metaSetters,
           propSetters,
           keySetters,
           beforeEnterHandlers,
           beforeLeaveHandlers,
           asyncComponentPromises,
-          ssrState[name].children,
+          (ssrState[name].children = {}),
           serverLoadFunctions,
           clientLoadFunctions
         )
