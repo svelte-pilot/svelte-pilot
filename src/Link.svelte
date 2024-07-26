@@ -21,8 +21,7 @@
 
 <script lang="ts">
   import isEqual from 'lodash-es/isEqual'
-  import { getContext } from 'svelte'
-  import { Writable } from 'svelte/store'
+  import { getContext, type Snippet } from 'svelte'
   import type {
     default as Router,
     Route,
@@ -32,21 +31,38 @@
   import { CTX_ROUTE, CTX_ROUTER } from './ctxKeys'
 
   const router: Router = getContext(CTX_ROUTER)
-  const route: Writable<Route> = getContext(CTX_ROUTE)
+  const route: () => Route = getContext(CTX_ROUTE)
 
-  let className = options.class
-  export { className as class }
-  export let activeClass = options.activeClass
-  export let to: Location | string
-  export let method = options.method
+  let {
+    class: className,
+    activeClass,
+    to,
+    method,
+    onclick: _onclick,
+    children,
+    ...props
+  }: {
+    class?: string
+    activeClass?: string
+    to: Location | string
+    method?: Method,
+    onclick?: (e: Event) => void
+    children: Snippet
+  } = $props()
 
-  let href = ''
-  let loc: ParsedLocation | undefined
-  let _class: string | undefined
+  let { loc, href, _class, active } = $derived.by(() => {
+    let loc: ParsedLocation | undefined
+    let href: string
 
-  $: active = loc?.path === $route.path
+    if (isExternalUrl(to)) {
+      loc = undefined
+      href = to
+    } else {
+      loc = router.parseLocation(to)
+      href = loc.href
+    }
 
-  $: {
+    const active = loc?.path === route().path
     const cls = []
 
     if (className) {
@@ -57,18 +73,9 @@
       cls.push(activeClass)
     }
 
-    _class = cls.length ? cls.join(' ') : undefined
-  }
-
-  $: {
-    if (isExternalUrl(to)) {
-      loc = undefined
-      href = to
-    } else {
-      loc = router.parseLocation(to)
-      href = loc.href
-    }
-  }
+    const _class = cls.length ? cls.join(' ') : undefined
+    return { href, loc, _class, active }
+  })
 
   function isExternalUrl(to: Location | string): to is string {
     if (to.constructor === String && /\w+:/.test(to)) {
@@ -84,13 +91,13 @@
     return false
   }
 
-  function onClick(e: Event) {
+  function onclick(e: Event) {
     if (!method || !loc || !router.test(to)) {
       return
     }
 
     e.preventDefault()
-    const current = $route
+    const current = route()
 
     const isSameLoc =
       loc.href === current.href &&
@@ -106,9 +113,13 @@
         router.push(to)
       }
     }
+
+    if (_onclick) {
+      _onclick(e)
+    }
   }
 </script>
 
-<a {href} class={_class} on:click on:click={onClick} {...$$restProps}>
-  <slot />
+<a {href} class={_class} {onclick} {...props}>
+  {@render children()}
 </a>

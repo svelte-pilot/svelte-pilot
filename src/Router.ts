@@ -1,16 +1,16 @@
 import { StringCaster } from 'cast-string'
-import { ComponentType } from 'svelte'
+import { type Component } from 'svelte'
 import URLRouter from 'url-router'
 
 export type PrimitiveType = string | number | boolean | null | undefined
 
 export type ComponentModule = {
-  default: ComponentType
+  default: Component<any>
   load?: LoadFunction
   beforeEnter?: NavigationGuard
 }
 
-export type SyncComponent = ComponentModule | ComponentType
+export type SyncComponent = ComponentModule | Component<any>
 export type AsyncComponent = () => Promise<ComponentModule>
 export type RouteProps =
   | Record<string, unknown>

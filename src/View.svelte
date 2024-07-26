@@ -1,46 +1,43 @@
 <script lang="ts">
-  import { getContext, onDestroy, setContext, ComponentType } from 'svelte'
-  import { writable, Readable, Writable } from 'svelte/store'
-  import { ResolvedView, SSRState, RouteProps } from './Router'
-  import { CTX_CHILDREN } from './ctxKeys'
+  import { getContext, setContext, type Component } from 'svelte'
+  import type { ResolvedView, SSRState } from './Router'
+  import { CTX_NODE } from './ctxKeys'
 
   type Node = { views?: ResolvedView['children']; ssrState?: SSRState }
 
-  export let name = 'default'
+  let { name = 'default' } = $props()
 
-  let view: ResolvedView | undefined
-  let component: ComponentType | undefined
-  let props: RouteProps
-  const parentStore: Readable<Node> = getContext(CTX_CHILDREN)
-  const childrenStore: Writable<Node> = writable()
+  const parent = getContext<() => Node | undefined>(CTX_NODE)
 
-  setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe })
+  let { view, component, _props, node } = $derived.by(() => {
+    const { views, ssrState } = parent() || {}
+    const view = views?.[name]
 
-  const unsubscribe = parentStore.subscribe(({ views, ssrState } = {}) => {
-    view = views?.[name]
+    if (!view) {
+      return {}
+    }
 
-    if (view) {
-      component =
-        (view.component as { default?: ComponentType })?.default ||
-        (view.component as ComponentType)
-
-      props = {
+    return {
+      view,
+      component:
+        (view.component as { default?: Component })?.default ||
+        (view.component as Component),
+      _props: {
         ...view.props,
         ...ssrState?.[name].data
-      }
-
-      childrenStore.set({
+      },
+      node: {
         views: view.children,
         ssrState: ssrState?.[name].children
-      })
+      }
     }
   })
 
-  onDestroy(unsubscribe)
+  setContext(CTX_NODE, () => node)
 </script>
 
 {#if view && component}
   {#key view.key}
-    <svelte:component this={component} {...props} />
+    <svelte:component this={component} {..._props} />
   {/key}
 {/if}

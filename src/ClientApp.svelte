@@ -1,18 +1,23 @@
 <script lang="ts">
-  import Router, { Route } from './Router'
+  import type {
+    default as Router,
+    Route,
+    ResolvedView,
+    SSRState
+  } from './Router'
   import { setContext } from 'svelte'
-  import { writable } from 'svelte/store'
   import View from './View.svelte'
-  import { CTX_CHILDREN, CTX_ROUTE, CTX_ROUTER } from './ctxKeys'
+  import { CTX_NODE, CTX_ROUTE, CTX_ROUTER } from './ctxKeys'
 
-  export let router: Router
+  type Node = { views?: ResolvedView['children']; ssrState?: SSRState }
 
-  const childrenStore = writable()
-  const routeStore = writable()
+  let { router }: { router: Router } = $props()
+
+  let node = $state<Node>()
+  let routeState = $state<Route>()
   setContext(CTX_ROUTER, router)
-  setContext(CTX_ROUTE, { subscribe: routeStore.subscribe })
-  setContext(CTX_CHILDREN, { subscribe: childrenStore.subscribe })
-
+  setContext(CTX_ROUTE, () => routeState)
+  setContext(CTX_NODE, () => node)
   router.on('update', update)
 
   if (router.current) {
@@ -20,12 +25,12 @@
   }
 
   function update(route: Route) {
-    childrenStore.set({
+    node = {
       views: route._views,
       ssrState: route.ssrState
-    })
+    }
 
-    routeStore.set(route)
+    routeState = route
   }
 </script>
 
