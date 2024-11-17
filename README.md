@@ -2,6 +2,8 @@
 
 Svelte Pilot is a lightweight, flexible, and feature-rich router.
 
+> Note: Svelte Pilot 5.x is compatible with Svelte 5, while Svelte Pilot 0.6.x is compatible with Svelte 4.
+
 ## Key Features
 - **Support for Server-Side Rendering (SSR)** - Svelte Pilot can run both on the client and server sides.
 - **Flexible Layout Configuration** -  By decoupling the relationship between path segments and nested views, Svelte Pilot allows URLs of different path segments to share the same layout, achieving high reuse of layouts.
