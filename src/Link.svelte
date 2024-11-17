@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   type Method = 'push' | 'replace' | null
 
   type Options = {
@@ -45,7 +45,7 @@
     class?: string
     activeClass?: string
     to: Location | string
-    method?: Method,
+    method?: Method
     onclick?: (e: Event) => void
     children: Snippet
   } = $props()

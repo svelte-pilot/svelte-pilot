@@ -9,7 +9,7 @@
 
   const parent = getContext<() => Node | undefined>(CTX_NODE)
 
-  let { view, component, _props, node } = $derived.by(() => {
+  let { view, Component, _props, node } = $derived.by(() => {
     const { views, ssrState } = parent() || {}
     const view = views?.[name]
 
@@ -19,7 +19,7 @@
 
     return {
       view,
-      component:
+      Component:
         (view.component as { default?: Component })?.default ||
         (view.component as Component),
       _props: {
@@ -36,8 +36,8 @@
   setContext(CTX_NODE, () => node)
 </script>
 
-{#if view && component}
+{#if view && Component}
   {#key view.key}
-    <svelte:component this={component} {..._props} />
+    <Component {..._props}></Component>
   {/key}
 {/if}
