@@ -1,17 +1,19 @@
-<script lang="ts">
-  import type {
-    default as Router,
-    Route,
-    ResolvedView,
-    SSRState
-  } from './Router'
+<script lang='ts'>
   import { setContext } from 'svelte'
-  import View from './View.svelte'
+
+  import type {
+    ResolvedView,
+    Route,
+    Router,
+    SSRState,
+  } from './Router'
+
   import { CTX_NODE, CTX_ROUTE, CTX_ROUTER } from './ctxKeys'
+  import View from './View.svelte'
 
-  type Node = { views?: ResolvedView['children']; ssrState?: SSRState }
+  type Node = { ssrState?: SSRState, views?: ResolvedView['children'] }
 
-  let { router }: { router: Router } = $props()
+  const { router }: { router: Router } = $props()
 
   let node = $state<Node>()
   let routeState = $state<Route>()
@@ -26,8 +28,8 @@
 
   function update(route: Route) {
     node = {
+      ssrState: route.ssrState,
       views: route._views,
-      ssrState: route.ssrState
     }
 
     routeState = route

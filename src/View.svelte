@@ -1,16 +1,17 @@
-<script lang="ts">
-  import { getContext, setContext, type Component } from 'svelte'
+<script lang='ts'>
+  import { type Component, getContext, setContext } from 'svelte'
+
   import type { ResolvedView, SSRState } from './Router'
+
   import { CTX_NODE } from './ctxKeys'
 
-  type Node = { views?: ResolvedView['children']; ssrState?: SSRState }
+  type Node = { ssrState?: SSRState, views?: ResolvedView['children'] }
 
-  let { name = 'default' } = $props()
-
+  const { name = 'default' } = $props()
   const parent = getContext<() => Node | undefined>(CTX_NODE)
 
-  let { view, Component, _props, node } = $derived.by(() => {
-    const { views, ssrState } = parent() || {}
+  const { _props, Com, node, view } = $derived.by(() => {
+    const { ssrState, views } = parent() || {}
     const view = views?.[name]
 
     if (!view) {
@@ -18,26 +19,26 @@
     }
 
     return {
-      view,
-      Component:
-        (view.component as { default?: Component })?.default ||
-        (view.component as Component),
       _props: {
         ...view.props,
-        ...ssrState?.[name].data
+        ...ssrState?.[name].data,
       },
+      Com:
+        (view.component as { default?: Component })?.default
+          || (view.component as Component),
       node: {
+        ssrState: ssrState?.[name].children,
         views: view.children,
-        ssrState: ssrState?.[name].children
-      }
+      },
+      view,
     }
   })
 
   setContext(CTX_NODE, () => node)
 </script>
 
-{#if view && Component}
+{#if view && Com}
   {#key view.key}
-    <Component {..._props}></Component>
+    <Com {..._props}></Com>
   {/key}
 {/if}

@@ -1,17 +1,17 @@
-<script lang="ts" module>
+<script lang='ts' module>
   type Method = 'push' | 'replace' | null
 
   type Options = {
-    method?: Method
-    class?: string
     activeClass?: string
+    class?: string
+    method?: Method
     origin?: string | string[]
   }
 
   export const options: Options = {
-    method: 'push',
+    activeClass: 'router-link-active',
     class: 'router-link',
-    activeClass: 'router-link-active'
+    method: 'push',
   }
 
   export function setOptions(opts: Options) {
@@ -19,45 +19,50 @@
   }
 </script>
 
-<script lang="ts">
+<script lang='ts'>
+  import type { HTMLAnchorAttributes } from 'svelte/elements'
+
   import isEqual from 'lodash-es/isEqual'
   import { getContext, type Snippet } from 'svelte'
+
   import type {
-    default as Router,
-    Route,
     Location,
-    ParsedLocation
+    ParsedLocation,
+    Route,
+    Router,
   } from './Router'
+
   import { CTX_ROUTE, CTX_ROUTER } from './ctxKeys'
 
   const router: Router = getContext(CTX_ROUTER)
   const route: () => Route = getContext(CTX_ROUTE)
 
-  let {
-    class: className,
+  const {
     activeClass,
-    to,
+    children,
+    class: className,
     method,
     onclick: _onclick,
-    children,
-    ...props
+    to,
+    ...rest
   }: {
-    class?: string
     activeClass?: string
-    to: Location | string
+    children: Snippet
+    class?: string
     method?: Method
     onclick?: (e: Event) => void
-    children: Snippet
-  } = $props()
+    to: Location | string
+  } & HTMLAnchorAttributes = $props()
 
-  let { loc, href, _class, active } = $derived.by(() => {
+  const { _class, href, loc } = $derived.by(() => {
     let loc: ParsedLocation | undefined
     let href: string
 
     if (isExternalUrl(to)) {
       loc = undefined
       href = to
-    } else {
+    }
+    else {
       loc = router.parseLocation(to)
       href = loc.href
     }
@@ -74,16 +79,18 @@
     }
 
     const _class = cls.length ? cls.join(' ') : undefined
-    return { href, loc, _class, active }
+    return { _class, active, href, loc }
   })
 
   function isExternalUrl(to: Location | string): to is string {
     if (to.constructor === String && /\w+:/.test(to)) {
       if (!options.origin?.length) {
         return true
-      } else if (Array.isArray(options.origin)) {
+      }
+      else if (Array.isArray(options.origin)) {
         return !options.origin.some(o => to.startsWith(o))
-      } else {
+      }
+      else {
         return !to.startsWith(options.origin)
       }
     }
@@ -99,17 +106,18 @@
     e.preventDefault()
     const current = route()
 
-    const isSameLoc =
-      loc.href === current.href &&
-      isEqual(
-        { ...loc.state, __position__: null },
-        { ...current.state, __position__: null }
-      )
+    const isSameLoc
+      = loc.href === current.href
+        && isEqual(
+          { ...loc.state, __position__: null },
+          { ...current.state, __position__: null },
+        )
 
     if (!isSameLoc) {
       if (method === 'replace') {
         router.replace(to)
-      } else {
+      }
+      else {
         router.push(to)
       }
     }
@@ -120,6 +128,6 @@
   }
 </script>
 
-<a {href} class={_class} {onclick} {...props}>
+<a {href} class={_class} {onclick} {...rest}>
   {@render children()}
 </a>
