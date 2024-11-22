@@ -1,7 +1,7 @@
 {
   "name": "svelte-pilot",
   "type": "module",
-  "version": "6.0.2",
+  "version": "6.0.3",
   "description": "A Svelte router that supports Server-Side Rendering (SSR).",
   "author": "Jiang Fengming <jiangfengming87@gmail.com>",
   "license": "MIT",
