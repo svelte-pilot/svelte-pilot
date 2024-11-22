@@ -37,11 +37,11 @@
   const router: Router = getContext(CTX_ROUTER)
   const route: () => Route = getContext(CTX_ROUTE)
 
-  const {
-    activeClass,
+  let {
+    activeClass = options.activeClass,
     children,
-    class: className,
-    method,
+    class: className = options.class,
+    method = options.method,
     onclick: _onclick,
     to,
     ...rest
@@ -54,7 +54,7 @@
     to: Location | string
   } & HTMLAnchorAttributes = $props()
 
-  const { _class, href, loc } = $derived.by(() => {
+  let { _class, href, loc } = $derived.by(() => {
     let loc: ParsedLocation | undefined
     let href: string
 

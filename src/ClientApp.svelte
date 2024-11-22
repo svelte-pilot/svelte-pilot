@@ -13,7 +13,7 @@
 
   type Node = { ssrState?: SSRState, views?: ResolvedView['children'] }
 
-  const { router }: { router: Router } = $props()
+  let { router }: { router: Router } = $props()
 
   let node = $state<Node>()
   let routeState = $state<Route>()

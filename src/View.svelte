@@ -7,10 +7,10 @@
 
   type Node = { ssrState?: SSRState, views?: ResolvedView['children'] }
 
-  const { name = 'default' } = $props()
+  let { name = 'default' } = $props()
   const parent = getContext<() => Node | undefined>(CTX_NODE)
 
-  const { _props, Com, node, view } = $derived.by(() => {
+  let { _props, Com, node, view } = $derived.by(() => {
     const { ssrState, views } = parent() || {}
     const view = views?.[name]
 
