@@ -20,10 +20,11 @@
 </script>
 
 <script lang='ts'>
+  import type { Snippet } from 'svelte'
   import type { HTMLAnchorAttributes } from 'svelte/elements'
 
   import isEqual from 'lodash-es/isEqual'
-  import { getContext, type Snippet } from 'svelte'
+  import { getContext } from 'svelte'
 
   import type {
     Location,
@@ -45,14 +46,14 @@
     onclick: _onclick,
     to,
     ...rest
-  }: {
+  }: HTMLAnchorAttributes & {
     activeClass?: string
     children: Snippet
     class?: string
     method?: Method
     onclick?: (e: Event) => void
     to: Location | string
-  } & HTMLAnchorAttributes = $props()
+  } = $props()
 
   let { _class, href, loc } = $derived.by(() => {
     let loc: ParsedLocation | undefined

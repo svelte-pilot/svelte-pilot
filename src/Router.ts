@@ -3,67 +3,35 @@ import type { Component } from 'svelte'
 import { StringCaster } from 'cast-string'
 import URLRouter from 'url-router'
 
-export type PrimitiveType = boolean | null | number | string | undefined
+export type AfterChangeHandler = (to: Route, from?: Route) => void
+
+export type AsyncComponent = () => Promise<ComponentModule>
 
 export interface ComponentModule {
   beforeEnter?: NavigationGuard
   default: Component<any>
   load?: LoadFunction
 }
+export type Errorhandler = (error: unknown) => void
+export type Event =
+  | 'afterChange'
+  | 'beforeChange'
+  | 'beforeCurrentRouteLeave'
+  | 'error'
+  | 'update'
+export type EventHandler =
+  | AfterChangeHandler
+  | Errorhandler
+  | NavigationGuard
+  | UpdateHandler
 
-export type SyncComponent = Component<any> | ComponentModule
-export type AsyncComponent = () => Promise<ComponentModule>
-export type RouteProps =
-  | ((route: Route) => Record<string, unknown>)
-  | Record<string, unknown>
-export type PropSetters = Array<(route: Route) => Record<string, unknown>>
-
-interface SSRStateNode {
-  children?: SSRState
-  data?: Record<string, unknown>
-}
-
-export type SSRState = Record<string, SSRStateNode>
+export type KeyFunction = (route: Route) => PrimitiveType
 
 export interface LoadFunction<Props = any, Ctx = any, Ret = any> {
   (props: Props, route: Route, loadFunctionContext: Ctx): Promise<Ret> | Ret
   cacheKey?: string[]
   callOnClient?: boolean
 }
-
-type ServerLoadFunctionWrapper = (
-  route: Route,
-  loadFunctionContext?: unknown
-) => void
-type ClientLoadFunctionWrapper = (route: Route) => void
-
-export type KeyFunction = (route: Route) => PrimitiveType
-
-export interface ViewConfig {
-  beforeEnter?: NavigationGuard
-  beforeLeave?: NavigationGuard
-  children?: ViewConfigGroup
-  component?: AsyncComponent | SyncComponent
-  key?: KeyFunction
-  meta?: RouteProps
-  name?: string
-  path?: string
-  props?: RouteProps
-}
-
-export type ViewConfigGroup = Array<ViewConfig | ViewConfig[]>
-
-export interface ResolvedView {
-  children?: Record<string, ResolvedView>
-  component?: SyncComponent
-  key?: PrimitiveType
-  name: string
-  props?: Record<string, unknown>
-}
-
-export type QueryParams =
-  | Record<string, PrimitiveType | PrimitiveType[]>
-  | URLSearchParams
 
 export interface Location {
   hash?: string
@@ -73,10 +41,32 @@ export interface Location {
   state?: Record<string, unknown>
 }
 
+export type NavigationGuard = (
+  to: Route,
+  from?: Route
+) => NavigationGuardResult | Promise<NavigationGuardResult>
+export type NavigationGuardResult = boolean | Location | string | void
+
 export type ParsedLocation = Pick<
   Route,
   'hash' | 'href' | 'path' | 'query' | 'search' | 'state'
 >
+
+export type PrimitiveType = boolean | null | number | string | undefined
+
+export type PropSetters = Array<(route: Route) => Record<string, unknown>>
+
+export type QueryParams =
+  | Record<string, PrimitiveType | PrimitiveType[]>
+  | URLSearchParams
+
+export interface ResolvedView {
+  children?: Record<string, ResolvedView>
+  component?: SyncComponent
+  key?: PrimitiveType
+  name: string
+  props?: Record<string, unknown>
+}
 
 export interface Route {
   _beforeLeaveHandlers: NavigationGuard[]
@@ -96,63 +86,52 @@ export interface Route {
   state: Record<string, unknown>
 }
 
-export type NavigationGuardResult = boolean | Location | string | void
+export type RouteProps =
+  | ((route: Route) => Record<string, unknown>)
+  | Record<string, unknown>
 
-export type NavigationGuard = (
-  to: Route,
-  from?: Route
-) => NavigationGuardResult | Promise<NavigationGuardResult>
+export type SSRState = Record<string, SSRStateNode>
 
-export type AfterChangeHandler = (to: Route, from?: Route) => void
+export type SyncComponent = Component<any> | ComponentModule
+
 export type UpdateHandler = (route: Route) => void
-export type Errorhandler = (error: unknown) => void
 
-export type Event =
-  | 'afterChange'
-  | 'beforeChange'
-  | 'beforeCurrentRouteLeave'
-  | 'error'
-  | 'update'
+export interface ViewConfig {
+  beforeEnter?: NavigationGuard
+  beforeLeave?: NavigationGuard
+  children?: ViewConfigGroup
+  component?: AsyncComponent | SyncComponent
+  key?: KeyFunction
+  meta?: RouteProps
+  name?: string
+  path?: string
+  props?: RouteProps
+}
+export type ViewConfigGroup = Array<ViewConfig | ViewConfig[]>
+type ClientLoadFunctionWrapper = (route: Route) => void
 
-export type EventHandler =
-  | AfterChangeHandler
-  | Errorhandler
-  | NavigationGuard
-  | UpdateHandler
+type ServerLoadFunctionWrapper = (
+  route: Route,
+  loadFunctionContext?: unknown
+) => void
 
-function appendSearchParams(
-  searchParams: URLSearchParams,
-  q: QueryParams,
-): void {
-  if (q instanceof URLSearchParams) {
-    q.forEach((val, key) => searchParams.append(key, val))
-  }
-  else {
-    Object.entries(q).forEach(([key, val]) => {
-      if (val !== null && val !== undefined) {
-        if (Array.isArray(val)) {
-          val.forEach(v => searchParams.append(key, String(v)))
-        }
-        else {
-          searchParams.append(key, String(val))
-        }
-      }
-    })
-  }
+interface SSRStateNode {
+  children?: SSRState
+  data?: Record<string, unknown>
 }
 
 export class Router {
+  base: string
+  callLoadOnClient: boolean
+  clientContext?: unknown
+  current?: Route
+  pathQuery: string
   private afterChangeHandlers: AfterChangeHandler[] = []
   private beforeChangeHandlers: NavigationGuard[] = []
   private errorHandlers: Errorhandler[] = []
   private onPopStateWrapper: () => void
   private updateHandlers: UpdateHandler[] = []
   private urlRouter: URLRouter<ViewConfig[][]>
-  base: string
-  callLoadOnClient: boolean
-  clientContext?: unknown
-  current?: Route
-  pathQuery: string
 
   constructor({
     base = '',
@@ -173,431 +152,6 @@ export class Router {
     this.onPopStateWrapper = () => this.onPopState()
     this.clientContext = clientContext
     this.callLoadOnClient = callLoadOnClient
-  }
-
-  private async callNavigationGuards(handlers: NavigationGuard[], to: Route) {
-    for (const handler of handlers) {
-      const ret = await handler(to, this.current)
-
-      if (ret === true || ret === undefined) {
-        continue
-      }
-      else if (ret === false) {
-        return false
-      }
-      else if (ret) {
-        return this.handleClient(ret)
-      }
-    }
-
-    return true
-  }
-
-  private emit(event: string, ...args: unknown[]) {
-    if (event === 'update') {
-      this.updateHandlers.forEach(fn => fn(...(<[Route]>args)))
-    }
-    else if (event === 'afterChange') {
-      this.afterChangeHandlers.forEach(fn => fn(...(<[Route, Route]>args)))
-    }
-    else if (event === 'error') {
-      this.errorHandlers.forEach(fn => fn(...(<[unknown]>args)))
-    }
-  }
-
-  private locationToInternalURL(location: Location | string) {
-    if (typeof location === 'string') {
-      location = { path: location }
-    }
-
-    const url = new URL(location.path, 'file:')
-
-    url.pathname = url.pathname.replace(/:([a-z]\w*)/gi, (_, w) =>
-      encodeURIComponent(<string>(<Location>location).params?.[w]))
-
-    if (location.query) {
-      appendSearchParams(url.searchParams, location.query)
-    }
-
-    if (location.hash) {
-      url.hash = location.hash
-    }
-
-    // `base` and `pathQuery` only have an effect on absolute URLs.
-    // Additionally, `base` and `pathQuery` are mutually exclusive.
-    if (/^\w+:/.test(location.path)) {
-      if (this.base) {
-        const base = this.base.endsWith('/')
-          ? this.base.slice(0, -1)
-          : this.base
-
-        if (
-          url.pathname.startsWith(base)
-          && ['/', undefined].includes(url.pathname[base.length])
-        ) {
-          url.pathname = url.pathname.slice(this.base.length) || '/'
-        }
-        else {
-          throw new Error(
-            `The base path "${this.base}" does not match the path "${location.path}".`,
-          )
-        }
-      }
-      else if (this.pathQuery) {
-        url.pathname = url.searchParams.get(this.pathQuery) || '/'
-        url.searchParams.delete(this.pathQuery)
-      }
-    }
-
-    url.searchParams.sort?.()
-    return url
-  }
-
-  private async onPopState(state?: Record<string, unknown>): Promise<void> {
-    const route = await this.handleClient({
-      path: location.href,
-      state: { ...history.state, ...state },
-    })
-
-    if (route) {
-      history.replaceState(
-        {
-          ...route.state,
-          __position__: history.state?.__position__ || history.length,
-        },
-        '',
-        route.href,
-      )
-    }
-    else {
-      this.silentGo(
-        <number>(<Route> this.current).state.__position__
-        - history.state.__position__,
-      )
-    }
-  }
-
-  private resolveViewConfigLayer(
-    layer: ViewConfig[],
-    skipLastViewChildren: boolean,
-    views: Record<string, ResolvedView>,
-    metaSetters: RouteProps[],
-    propSetters: PropSetters,
-    keySetters: KeyFunction[],
-    beforeEnterHandlers: NavigationGuard[],
-    beforeLeaveHandlers: NavigationGuard[],
-    asyncComponentPromises: Promise<SyncComponent>[],
-    ssrState: SSRState,
-    serverLoadFunctions?: ServerLoadFunctionWrapper[],
-    clientLoadFunctions?: ClientLoadFunctionWrapper[],
-  ): void {
-    layer.forEach((ViewConfig) => {
-      const {
-        beforeEnter,
-        beforeLeave,
-        children,
-        component,
-        key,
-        meta,
-        name = 'default',
-        props,
-      } = ViewConfig
-      const view: ResolvedView = (views[name] = { name })
-
-      if (beforeEnter) {
-        beforeEnterHandlers.push(beforeEnter)
-      }
-
-      if (beforeLeave) {
-        beforeLeaveHandlers.push(beforeLeave)
-      }
-
-      if (meta) {
-        metaSetters.push(meta)
-      }
-
-      if (props) {
-        if (props instanceof Function) {
-          propSetters.push(route => (view.props = props(route)))
-        }
-        else {
-          view.props = props
-        }
-      }
-
-      if (key) {
-        keySetters.push(route => (view.key = key(route)))
-      }
-
-      ssrState[name] = {}
-
-      if (component) {
-        const pushLoadFn = (load: LoadFunction, ssrState: SSRStateNode) => {
-          if (serverLoadFunctions) {
-            serverLoadFunctions.push(
-              async (route, ctx) =>
-                (ssrState.data = await load(view.props || {}, route, ctx)),
-            )
-          }
-          else if (clientLoadFunctions) {
-            if (
-              load.callOnClient
-              || (load.callOnClient === undefined && this.callLoadOnClient)
-            ) {
-              clientLoadFunctions.push(async (route) => {
-                let key = ''
-                const props = view.props
-
-                if (props) {
-                  key = JSON.stringify(
-                    load.cacheKey?.map(k => props[k]) || Object.values(props),
-                  )
-                }
-
-                const setState = (data: Record<string, unknown>) => {
-                  let mapItem = route._ssrStateMap.get(load)
-
-                  if (!mapItem) {
-                    mapItem = {}
-                    route._ssrStateMap.set(load, mapItem)
-                  }
-
-                  mapItem[key] = ssrState.data = data
-                }
-
-                const cache = this.current?._ssrStateMap.get(load)
-
-                if (cache?.[key]) {
-                  setState(cache[key])
-                }
-                else {
-                  setState(
-                    await load(view.props || {}, route, this.clientContext),
-                  )
-                }
-              })
-            }
-          }
-        }
-
-        if (component instanceof Function && !component.length) {
-          asyncComponentPromises.push(
-            (<AsyncComponent>component)().then((component) => {
-              ViewConfig.component = view.component = component
-
-              if (component.load && ssrState) {
-                pushLoadFn(component.load, ssrState[name])
-              }
-
-              return component
-            }),
-          )
-        }
-        else {
-          view.component = <ComponentModule>component
-
-          if (view.component.beforeEnter) {
-            beforeEnterHandlers.push(view.component.beforeEnter)
-          }
-
-          if (view.component.load) {
-            pushLoadFn(view.component.load, ssrState[name])
-          }
-        }
-      }
-
-      if (
-        children
-        && (!skipLastViewChildren || ViewConfig !== layer[layer.length - 1])
-      ) {
-        this.resolveViewConfigLayer(
-          children.filter(
-            (v): v is ViewConfig => !(Array.isArray(v)) && !v.path,
-          ),
-          false,
-          (view.children = {}),
-          metaSetters,
-          propSetters,
-          keySetters,
-          beforeEnterHandlers,
-          beforeLeaveHandlers,
-          asyncComponentPromises,
-          (ssrState[name].children = {}),
-          serverLoadFunctions,
-          clientLoadFunctions,
-        )
-      }
-    })
-  }
-
-  private resolveViewConfigLayers(
-    layers: ViewConfig[][],
-    {
-      clientLoadFunctions,
-      serverLoadFunctions,
-    }: {
-      clientLoadFunctions?: ClientLoadFunctionWrapper[]
-      serverLoadFunctions?: ServerLoadFunctionWrapper[]
-    },
-  ) {
-    const views: Record<string, ResolvedView> = {}
-    const metaSetters: RouteProps[] = []
-    const propSetters: PropSetters = []
-    const keySetters: KeyFunction[] = []
-    const beforeEnterHandlers: NavigationGuard[] = []
-    const beforeLeaveHandlers: NavigationGuard[] = []
-    const asyncComponentPromises: Promise<SyncComponent>[] = []
-    const ssrState: SSRState = {}
-
-    let children = views
-    let childState = ssrState
-
-    layers.forEach((layer, i) => {
-      this.resolveViewConfigLayer(
-        layer,
-        true,
-        children,
-        metaSetters,
-        propSetters,
-        keySetters,
-        beforeEnterHandlers,
-        beforeLeaveHandlers,
-        asyncComponentPromises,
-        childState,
-        serverLoadFunctions,
-        clientLoadFunctions,
-      )
-
-      if (i !== layers.length - 1) {
-        const linkViewName = layer[layer.length - 1].name || 'default'
-        children = children[linkViewName].children = {}
-
-        if (childState) {
-          childState = childState[linkViewName].children = {}
-        }
-      }
-    })
-
-    return {
-      asyncComponentPromises,
-      beforeEnterHandlers,
-      beforeLeaveHandlers,
-      clientLoadFunctions,
-      keySetters,
-      metaSetters,
-      propSetters,
-      serverLoadFunctions,
-      ssrState,
-      views,
-    }
-  }
-
-  private silentGo(delta: number, callback?: () => void): void {
-    const onPopState = () => {
-      window.removeEventListener('popstate', onPopState)
-      window.addEventListener('popstate', this.onPopStateWrapper)
-
-      if (callback) {
-        callback()
-      }
-    }
-
-    window.removeEventListener('popstate', this.onPopStateWrapper)
-    window.addEventListener('popstate', onPopState)
-    history.go(delta)
-  }
-
-  private toExternalUrl(url: URL) {
-    if (this.pathQuery) {
-      const u = new URL(url.href)
-
-      if (url.pathname !== '/') {
-        u.searchParams.set(this.pathQuery, url.pathname)
-      }
-
-      return u.search + u.hash
-    }
-    else {
-      // If `base` does not end with '/', and the path is the root ('/'), the ending slash will be trimmed.
-      return (
-        (this.base
-          ? this.base.endsWith('/')
-            ? this.base + url.pathname.slice(1)
-            : url.pathname === '/'
-              ? this.base
-              : this.base + url.pathname
-          : url.pathname)
-        + url.search
-        + url.hash
-      )
-    }
-  }
-
-  private toViewConfigLayers(
-    viewConfigGroup: ViewConfigGroup,
-    sideViewConfigArray: ViewConfig[] = [],
-    layers: ViewConfig[][] = [],
-    result: Record<string, ViewConfig[][]> = {},
-  ) {
-    // Views within the same array have higher priority than those outside it.
-    const sideViewsWithinGroup = viewConfigGroup.filter(
-      (v): v is ViewConfig => !Array.isArray(v) && !v.path,
-    )
-
-    const sideViewNames = sideViewsWithinGroup.map(v => v.name)
-
-    sideViewConfigArray = sideViewConfigArray
-      .filter(v => !sideViewNames.includes(v.name))
-      .concat(sideViewsWithinGroup)
-
-    for (const viewConfig of viewConfigGroup) {
-      if (Array.isArray(viewConfig)) {
-        this.toViewConfigLayers(viewConfig, sideViewConfigArray, layers, result)
-      }
-      else if (viewConfig.path || viewConfig.children) {
-        const _layers = [
-          ...layers,
-          sideViewConfigArray
-            .filter(v => v.name !== viewConfig.name)
-            .concat(viewConfig),
-        ]
-
-        if (viewConfig.path) {
-          result[viewConfig.path] = _layers
-        }
-        else if (viewConfig.children) {
-          this.toViewConfigLayers(
-            viewConfig.children,
-            sideViewConfigArray,
-            _layers,
-            result,
-          )
-        }
-      }
-    }
-
-    return result
-  }
-
-  private updateRoute(route: Route) {
-    this.updateRouteMeta(route)
-    this.updateRouteProps(route)
-    this.updateRouteKeys(route)
-  }
-
-  private updateRouteKeys(route: Route) {
-    route._keySetters.forEach(fn => fn(route))
-  }
-
-  private updateRouteMeta(route: Route) {
-    const meta: Record<string, unknown> = (route.meta = {})
-    route._metaSetters.forEach(v =>
-      Object.assign(meta, v instanceof Function ? v(route) : v),
-    )
-  }
-
-  private updateRouteProps(route: Route) {
-    route._propSetters.forEach(fn => fn(route))
   }
 
   back(state?: Record<string, unknown>): void {
@@ -965,6 +519,452 @@ export class Router {
 
   test(location: Location | string): boolean {
     return Boolean(this.urlRouter.find(this.parseLocation(location).path))
+  }
+
+  private async callNavigationGuards(handlers: NavigationGuard[], to: Route) {
+    for (const handler of handlers) {
+      const ret = await handler(to, this.current)
+
+      if (ret === true || ret === undefined) {
+        continue
+      }
+      else if (ret === false) {
+        return false
+      }
+      else if (ret) {
+        return this.handleClient(ret)
+      }
+    }
+
+    return true
+  }
+
+  private emit(event: string, ...args: unknown[]) {
+    if (event === 'update') {
+      this.updateHandlers.forEach(fn => fn(...(<[Route]>args)))
+    }
+    else if (event === 'afterChange') {
+      this.afterChangeHandlers.forEach(fn => fn(...(<[Route, Route]>args)))
+    }
+    else if (event === 'error') {
+      this.errorHandlers.forEach(fn => fn(...(<[unknown]>args)))
+    }
+  }
+
+  private locationToInternalURL(location: Location | string) {
+    if (typeof location === 'string') {
+      location = { path: location }
+    }
+
+    const url = new URL(location.path, 'file:')
+
+    url.pathname = url.pathname.replace(/:([a-z]\w*)/gi, (_, w) =>
+      encodeURIComponent(<string>(<Location>location).params?.[w]))
+
+    if (location.query) {
+      appendSearchParams(url.searchParams, location.query)
+    }
+
+    if (location.hash) {
+      url.hash = location.hash
+    }
+
+    // `base` and `pathQuery` only have an effect on absolute URLs.
+    // Additionally, `base` and `pathQuery` are mutually exclusive.
+    if (/^\w+:/.test(location.path)) {
+      if (this.base) {
+        const base = this.base.endsWith('/')
+          ? this.base.slice(0, -1)
+          : this.base
+
+        if (
+          url.pathname.startsWith(base)
+          && ['/', undefined].includes(url.pathname[base.length])
+        ) {
+          url.pathname = url.pathname.slice(this.base.length) || '/'
+        }
+        else {
+          throw new Error(
+            `The base path "${this.base}" does not match the path "${location.path}".`,
+          )
+        }
+      }
+      else if (this.pathQuery) {
+        url.pathname = url.searchParams.get(this.pathQuery) || '/'
+        url.searchParams.delete(this.pathQuery)
+      }
+    }
+
+    url.searchParams.sort?.()
+    return url
+  }
+
+  private async onPopState(state?: Record<string, unknown>): Promise<void> {
+    const route = await this.handleClient({
+      path: location.href,
+      state: { ...history.state, ...state },
+    })
+
+    if (route) {
+      history.replaceState(
+        {
+          ...route.state,
+          __position__: history.state?.__position__ || history.length,
+        },
+        '',
+        route.href,
+      )
+    }
+    else {
+      this.silentGo(
+        <number>(<Route> this.current).state.__position__
+        - history.state.__position__,
+      )
+    }
+  }
+
+  private resolveViewConfigLayer(
+    layer: ViewConfig[],
+    skipLastViewChildren: boolean,
+    views: Record<string, ResolvedView>,
+    metaSetters: RouteProps[],
+    propSetters: PropSetters,
+    keySetters: KeyFunction[],
+    beforeEnterHandlers: NavigationGuard[],
+    beforeLeaveHandlers: NavigationGuard[],
+    asyncComponentPromises: Promise<SyncComponent>[],
+    ssrState: SSRState,
+    serverLoadFunctions?: ServerLoadFunctionWrapper[],
+    clientLoadFunctions?: ClientLoadFunctionWrapper[],
+  ): void {
+    layer.forEach((ViewConfig) => {
+      const {
+        beforeEnter,
+        beforeLeave,
+        children,
+        component,
+        key,
+        meta,
+        name = 'default',
+        props,
+      } = ViewConfig
+      const view: ResolvedView = (views[name] = { name })
+
+      if (beforeEnter) {
+        beforeEnterHandlers.push(beforeEnter)
+      }
+
+      if (beforeLeave) {
+        beforeLeaveHandlers.push(beforeLeave)
+      }
+
+      if (meta) {
+        metaSetters.push(meta)
+      }
+
+      if (props) {
+        if (typeof props === 'function') {
+          propSetters.push(route => (view.props = props(route)))
+        }
+        else {
+          view.props = props
+        }
+      }
+
+      if (key) {
+        keySetters.push(route => (view.key = key(route)))
+      }
+
+      ssrState[name] = {}
+
+      if (component) {
+        const pushLoadFn = (load: LoadFunction, ssrState: SSRStateNode) => {
+          if (serverLoadFunctions) {
+            serverLoadFunctions.push(
+              async (route, ctx) =>
+                (ssrState.data = await load(view.props || {}, route, ctx)),
+            )
+          }
+          else if (clientLoadFunctions) {
+            if (
+              load.callOnClient
+              || (load.callOnClient === undefined && this.callLoadOnClient)
+            ) {
+              clientLoadFunctions.push(async (route) => {
+                let key = ''
+                const props = view.props
+
+                if (props) {
+                  key = JSON.stringify(
+                    load.cacheKey?.map(k => props[k]) || Object.values(props),
+                  )
+                }
+
+                const setState = (data: Record<string, unknown>) => {
+                  let mapItem = route._ssrStateMap.get(load)
+
+                  if (!mapItem) {
+                    mapItem = {}
+                    route._ssrStateMap.set(load, mapItem)
+                  }
+
+                  mapItem[key] = ssrState.data = data
+                }
+
+                const cache = this.current?._ssrStateMap.get(load)
+
+                if (cache?.[key]) {
+                  setState(cache[key])
+                }
+                else {
+                  setState(
+                    await load(view.props || {}, route, this.clientContext),
+                  )
+                }
+              })
+            }
+          }
+        }
+
+        if (typeof component === 'function' && !component.length) {
+          asyncComponentPromises.push(
+            (<AsyncComponent>component)().then((component) => {
+              ViewConfig.component = view.component = component
+
+              if (component.load && ssrState) {
+                pushLoadFn(component.load, ssrState[name])
+              }
+
+              return component
+            }),
+          )
+        }
+        else {
+          view.component = <ComponentModule>component
+
+          if (view.component.beforeEnter) {
+            beforeEnterHandlers.push(view.component.beforeEnter)
+          }
+
+          if (view.component.load) {
+            pushLoadFn(view.component.load, ssrState[name])
+          }
+        }
+      }
+
+      if (
+        children
+        && (!skipLastViewChildren || ViewConfig !== layer[layer.length - 1])
+      ) {
+        this.resolveViewConfigLayer(
+          children.filter(
+            (v): v is ViewConfig => !(Array.isArray(v)) && !v.path,
+          ),
+          false,
+          (view.children = {}),
+          metaSetters,
+          propSetters,
+          keySetters,
+          beforeEnterHandlers,
+          beforeLeaveHandlers,
+          asyncComponentPromises,
+          (ssrState[name].children = {}),
+          serverLoadFunctions,
+          clientLoadFunctions,
+        )
+      }
+    })
+  }
+
+  private resolveViewConfigLayers(
+    layers: ViewConfig[][],
+    {
+      clientLoadFunctions,
+      serverLoadFunctions,
+    }: {
+      clientLoadFunctions?: ClientLoadFunctionWrapper[]
+      serverLoadFunctions?: ServerLoadFunctionWrapper[]
+    },
+  ) {
+    const views: Record<string, ResolvedView> = {}
+    const metaSetters: RouteProps[] = []
+    const propSetters: PropSetters = []
+    const keySetters: KeyFunction[] = []
+    const beforeEnterHandlers: NavigationGuard[] = []
+    const beforeLeaveHandlers: NavigationGuard[] = []
+    const asyncComponentPromises: Promise<SyncComponent>[] = []
+    const ssrState: SSRState = {}
+
+    let children = views
+    let childState = ssrState
+
+    layers.forEach((layer, i) => {
+      this.resolveViewConfigLayer(
+        layer,
+        true,
+        children,
+        metaSetters,
+        propSetters,
+        keySetters,
+        beforeEnterHandlers,
+        beforeLeaveHandlers,
+        asyncComponentPromises,
+        childState,
+        serverLoadFunctions,
+        clientLoadFunctions,
+      )
+
+      if (i !== layers.length - 1) {
+        const linkViewName = layer[layer.length - 1].name || 'default'
+        children = children[linkViewName].children = {}
+
+        if (childState) {
+          childState = childState[linkViewName].children = {}
+        }
+      }
+    })
+
+    return {
+      asyncComponentPromises,
+      beforeEnterHandlers,
+      beforeLeaveHandlers,
+      clientLoadFunctions,
+      keySetters,
+      metaSetters,
+      propSetters,
+      serverLoadFunctions,
+      ssrState,
+      views,
+    }
+  }
+
+  private silentGo(delta: number, callback?: () => void): void {
+    const onPopState = () => {
+      window.removeEventListener('popstate', onPopState)
+      window.addEventListener('popstate', this.onPopStateWrapper)
+
+      if (callback) {
+        callback()
+      }
+    }
+
+    window.removeEventListener('popstate', this.onPopStateWrapper)
+    window.addEventListener('popstate', onPopState)
+    history.go(delta)
+  }
+
+  private toExternalUrl(url: URL) {
+    if (this.pathQuery) {
+      const u = new URL(url.href)
+
+      if (url.pathname !== '/') {
+        u.searchParams.set(this.pathQuery, url.pathname)
+      }
+
+      return u.search + u.hash
+    }
+    else {
+      // If `base` does not end with '/', and the path is the root ('/'), the ending slash will be trimmed.
+      return (
+        (this.base
+          ? this.base.endsWith('/')
+            ? this.base + url.pathname.slice(1)
+            : url.pathname === '/'
+              ? this.base
+              : this.base + url.pathname
+          : url.pathname)
+        + url.search
+        + url.hash
+      )
+    }
+  }
+
+  private toViewConfigLayers(
+    viewConfigGroup: ViewConfigGroup,
+    sideViewConfigArray: ViewConfig[] = [],
+    layers: ViewConfig[][] = [],
+    result: Record<string, ViewConfig[][]> = {},
+  ) {
+    // Views within the same array have higher priority than those outside it.
+    const sideViewsWithinGroup = viewConfigGroup.filter(
+      (v): v is ViewConfig => !Array.isArray(v) && !v.path,
+    )
+
+    const sideViewNames = sideViewsWithinGroup.map(v => v.name)
+
+    sideViewConfigArray = sideViewConfigArray
+      .filter(v => !sideViewNames.includes(v.name))
+      .concat(sideViewsWithinGroup)
+
+    for (const viewConfig of viewConfigGroup) {
+      if (Array.isArray(viewConfig)) {
+        this.toViewConfigLayers(viewConfig, sideViewConfigArray, layers, result)
+      }
+      else if (viewConfig.path || viewConfig.children) {
+        const _layers = [
+          ...layers,
+          sideViewConfigArray
+            .filter(v => v.name !== viewConfig.name)
+            .concat(viewConfig),
+        ]
+
+        if (viewConfig.path) {
+          result[viewConfig.path] = _layers
+        }
+        else if (viewConfig.children) {
+          this.toViewConfigLayers(
+            viewConfig.children,
+            sideViewConfigArray,
+            _layers,
+            result,
+          )
+        }
+      }
+    }
+
+    return result
+  }
+
+  private updateRoute(route: Route) {
+    this.updateRouteMeta(route)
+    this.updateRouteProps(route)
+    this.updateRouteKeys(route)
+  }
+
+  private updateRouteKeys(route: Route) {
+    route._keySetters.forEach(fn => fn(route))
+  }
+
+  private updateRouteMeta(route: Route) {
+    const meta: Record<string, unknown> = (route.meta = {})
+    route._metaSetters.forEach(v =>
+      Object.assign(meta, typeof v === 'function' ? v(route) : v),
+    )
+  }
+
+  private updateRouteProps(route: Route) {
+    route._propSetters.forEach(fn => fn(route))
+  }
+}
+
+function appendSearchParams(
+  searchParams: URLSearchParams,
+  q: QueryParams,
+): void {
+  if (q instanceof URLSearchParams) {
+    q.forEach((val, key) => searchParams.append(key, val))
+  }
+  else {
+    Object.entries(q).forEach(([key, val]) => {
+      if (val !== null && val !== undefined) {
+        if (Array.isArray(val)) {
+          val.forEach(v => searchParams.append(key, String(v)))
+        }
+        else {
+          searchParams.append(key, String(val))
+        }
+      }
+    })
   }
 }
 

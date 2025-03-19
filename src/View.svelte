@@ -1,5 +1,7 @@
 <script lang='ts'>
-  import { type Component, getContext, setContext } from 'svelte'
+  import type { Component } from 'svelte'
+
+  import { getContext, setContext } from 'svelte'
 
   import type { ResolvedView, SSRState } from './Router'
 
