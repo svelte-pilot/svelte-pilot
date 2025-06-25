@@ -1,4 +1,4 @@
-<script lang='ts' module>
+<script lang="ts" module>
   type Method = 'push' | 'replace' | null
 
   type Options = {
@@ -11,7 +11,7 @@
   export const options: Options = {
     activeClass: 'router-link-active',
     class: 'router-link',
-    method: 'push',
+    method: 'push'
   }
 
   export function setOptions(opts: Options) {
@@ -19,20 +19,11 @@
   }
 </script>
 
-<script lang='ts'>
-  import type { Snippet } from 'svelte'
+<script lang="ts">
+  import { getContext, type Snippet } from 'svelte'
   import type { HTMLAnchorAttributes } from 'svelte/elements'
-
   import isEqual from 'lodash-es/isEqual'
-  import { getContext } from 'svelte'
-
-  import type {
-    Location,
-    ParsedLocation,
-    Route,
-    Router,
-  } from './Router'
-
+  import type { Location, ParsedLocation, Route, Router } from './Router'
   import { CTX_ROUTE, CTX_ROUTER } from './ctxKeys'
 
   const router: Router = getContext(CTX_ROUTER)
@@ -62,8 +53,7 @@
     if (isExternalUrl(to)) {
       loc = undefined
       href = to
-    }
-    else {
+    } else {
       loc = router.parseLocation(to)
       href = loc.href
     }
@@ -87,11 +77,9 @@
     if (to.constructor === String && /\w+:/.test(to)) {
       if (!options.origin?.length) {
         return true
-      }
-      else if (Array.isArray(options.origin)) {
+      } else if (Array.isArray(options.origin)) {
         return !options.origin.some(o => to.startsWith(o))
-      }
-      else {
+      } else {
         return !to.startsWith(options.origin)
       }
     }
@@ -111,18 +99,17 @@
     e.preventDefault()
     const current = route()
 
-    const isSameLoc
-      = loc.href === current.href
-        && isEqual(
-          { ...loc.state, __position__: null },
-          { ...current.state, __position__: null },
-        )
+    const isSameLoc =
+      loc.href === current.href &&
+      isEqual(
+        { ...loc.state, __position__: null },
+        { ...current.state, __position__: null }
+      )
 
     if (!isSameLoc) {
       if (method === 'replace') {
         router.replace(to)
-      }
-      else {
+      } else {
         router.push(to)
       }
     }

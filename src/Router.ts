@@ -1,5 +1,4 @@
 import type { Component } from 'svelte'
-
 import { StringCaster } from 'cast-string'
 import URLRouter from 'url-router'
 
@@ -138,7 +137,7 @@ export class Router {
     callLoadOnClient = false,
     clientContext,
     pathQuery = '',
-    routes,
+    routes
   }: {
     base?: string
     callLoadOnClient?: boolean
@@ -162,11 +161,11 @@ export class Router {
     location: Location | string,
     {
       clientLoadFunctions,
-      serverLoadFunctions,
+      serverLoadFunctions
     }: {
       clientLoadFunctions?: ClientLoadFunctionWrapper[]
       serverLoadFunctions?: ServerLoadFunctionWrapper[]
-    },
+    }
   ) {
     const loc = this.parseLocation(location)
     const matchedURLRoute = this.urlRouter.find(loc.path)
@@ -183,10 +182,10 @@ export class Router {
       metaSetters,
       propSetters,
       ssrState,
-      views,
+      views
     } = this.resolveViewConfigLayers(matchedURLRoute.handler, {
       clientLoadFunctions,
-      serverLoadFunctions,
+      serverLoadFunctions
     })
 
     const route: Route = {
@@ -199,7 +198,7 @@ export class Router {
       _views: views,
       meta: {},
       params: new StringCaster(matchedURLRoute.params),
-      ssrState,
+      ssrState
     }
 
     this.updateRoute(route)
@@ -209,7 +208,7 @@ export class Router {
       beforeEnterHandlers,
       clientLoadFunctions,
       route,
-      serverLoadFunctions,
+      serverLoadFunctions
     }
   }
 
@@ -220,15 +219,14 @@ export class Router {
   go(delta: number, state?: Record<string, unknown>): void {
     if (state) {
       this.silentGo(delta, () => this.onPopState(state))
-    }
-    else {
+    } else {
       history.go(delta)
     }
   }
 
   async handleClient(
     location: Location | string,
-    ssrState?: SSRState,
+    ssrState?: SSRState
   ): Promise<false | Route | undefined> {
     try {
       const clientLoadFunctions: ClientLoadFunctionWrapper[] = []
@@ -243,9 +241,9 @@ export class Router {
       let ret = await this.callNavigationGuards(
         (this.current?._beforeLeaveHandlers || []).concat(
           this.beforeChangeHandlers,
-          beforeEnterHandlers,
+          beforeEnterHandlers
         ),
-        route,
+        route
       )
 
       if (ret !== true) {
@@ -258,7 +256,7 @@ export class Router {
         modules
           .filter((m): m is ComponentModule => 'beforeEnter' in m)
           .map(m => <NavigationGuard>m.beforeEnter),
-        route,
+        route
       )
 
       if (ret !== true) {
@@ -267,11 +265,10 @@ export class Router {
 
       if (!ssrState) {
         await Promise.all(clientLoadFunctions.map(fn => fn(route)))
-      }
-      else {
+      } else {
         const restore = (
           ssrState: SSRState,
-          views: Record<string, ResolvedView>,
+          views: Record<string, ResolvedView>
         ) => {
           Object.entries(ssrState).forEach(([name, ssrStateNode]) => {
             const view = views[name]
@@ -288,8 +285,7 @@ export class Router {
               if (props) {
                 if (load.cacheKey) {
                   key = JSON.stringify(load.cacheKey.map(k => props[k]))
-                }
-                else {
+                } else {
                   key = JSON.stringify(Object.values(props))
                 }
               }
@@ -312,8 +308,7 @@ export class Router {
       this.emit('update', route)
       setTimeout(() => this.emit('afterChange', route, from))
       return route
-    }
-    catch (e) {
+    } catch (e) {
       if (e instanceof Error) {
         this.emit('error', e)
         throw e
@@ -323,7 +318,7 @@ export class Router {
 
   async handleServer(
     location: Location | string,
-    loadFunctionContext?: unknown,
+    loadFunctionContext?: unknown
   ): Promise<Route | undefined> {
     const serverLoadFunctions: ServerLoadFunctionWrapper[] = []
     const _route = this.findRoute(location, { serverLoadFunctions })
@@ -336,7 +331,7 @@ export class Router {
     await Promise.all(asyncComponentPromises)
 
     await Promise.all(
-      serverLoadFunctions.map(fn => fn(route, loadFunctionContext)),
+      serverLoadFunctions.map(fn => fn(route, loadFunctionContext))
     )
 
     return route
@@ -349,22 +344,18 @@ export class Router {
   off(event: Event, handler: EventHandler): void {
     if (event === 'beforeChange') {
       this.beforeChangeHandlers = this.beforeChangeHandlers.filter(
-        fn => fn !== handler,
+        fn => fn !== handler
       )
-    }
-    else if (event === 'beforeCurrentRouteLeave' && this.current) {
-      this.current._beforeLeaveHandlers
-        = this.current._beforeLeaveHandlers.filter(fn => fn !== handler)
-    }
-    else if (event === 'update') {
+    } else if (event === 'beforeCurrentRouteLeave' && this.current) {
+      this.current._beforeLeaveHandlers =
+        this.current._beforeLeaveHandlers.filter(fn => fn !== handler)
+    } else if (event === 'update') {
       this.updateHandlers = this.updateHandlers.filter(fn => fn !== handler)
-    }
-    else if (event === 'afterChange') {
+    } else if (event === 'afterChange') {
       this.afterChangeHandlers = this.afterChangeHandlers.filter(
-        fn => fn !== handler,
+        fn => fn !== handler
       )
-    }
-    else if (event === 'error') {
+    } else if (event === 'error') {
       this.errorHandlers = this.errorHandlers.filter(fn => fn !== handler)
     }
   }
@@ -378,17 +369,13 @@ export class Router {
   on(event: Event, handler: EventHandler): void {
     if (event === 'beforeChange') {
       this.beforeChangeHandlers.push(handler)
-    }
-    else if (event === 'beforeCurrentRouteLeave') {
+    } else if (event === 'beforeCurrentRouteLeave') {
       this.current?._beforeLeaveHandlers.push(handler)
-    }
-    else if (event === 'update') {
+    } else if (event === 'update') {
       this.updateHandlers.push(handler)
-    }
-    else if (event === 'afterChange') {
+    } else if (event === 'afterChange') {
       this.afterChangeHandlers.push(handler)
-    }
-    else if (event === 'error') {
+    } else if (event === 'error') {
       this.errorHandlers.push(handler as Errorhandler)
     }
   }
@@ -400,7 +387,7 @@ export class Router {
   once(event: 'error', handler: Errorhandler): void
   once(
     event: Event,
-    handler: AfterChangeHandler | NavigationGuard | UpdateHandler,
+    handler: AfterChangeHandler | NavigationGuard | UpdateHandler
   ): void {
     const h = (...args: unknown[]) => {
       this.off(event, h)
@@ -421,7 +408,7 @@ export class Router {
       query: new StringCaster(url.searchParams),
       search: url.search,
       state:
-        typeof location === 'string' || !location.state ? {} : location.state,
+        typeof location === 'string' || !location.state ? {} : location.state
     }
   }
 
@@ -432,10 +419,10 @@ export class Router {
       history.pushState(
         {
           ...route.state,
-          __position__: history.state.__position__ + 1,
+          __position__: history.state.__position__ + 1
         },
         '',
-        route.href,
+        route.href
       )
 
       window.scrollTo(0, 0)
@@ -449,10 +436,10 @@ export class Router {
       history.replaceState(
         {
           ...route.state,
-          __position__: history.state.__position__,
+          __position__: history.state.__position__
         },
         '',
-        route.href,
+        route.href
       )
 
       window.scrollTo(0, 0)
@@ -466,9 +453,9 @@ export class Router {
       history.replaceState(
         {
           ...this.current.state,
-          __position__: history.state.__position__,
+          __position__: history.state.__position__
         },
-        '',
+        ''
       )
 
       this.updateRoute(this.current)
@@ -481,12 +468,12 @@ export class Router {
     {
       clientContext,
       path,
-      ssrState,
+      ssrState
     }: {
       clientContext?: unknown
       path?: Location | string
       ssrState?: SSRState
-    } = {},
+    } = {}
   ) {
     this.clientContext = clientContext
     window.addEventListener('popstate', this.onPopStateWrapper)
@@ -498,18 +485,16 @@ export class Router {
     if (ssrState) {
       this.handleClient(
         path || { path: location.href, state: history.state },
-        ssrState,
+        ssrState
       )
       this.once('update', onReady)
-    }
-    else {
+    } else {
       if (path) {
         this.handleClient(path)
-      }
-      else {
+      } else {
         this.replace({
           path: location.href,
-          state: history.state,
+          state: history.state
         })
       }
 
@@ -527,11 +512,9 @@ export class Router {
 
       if (ret === true || ret === undefined) {
         continue
-      }
-      else if (ret === false) {
+      } else if (ret === false) {
         return false
-      }
-      else if (ret) {
+      } else if (ret) {
         return this.handleClient(ret)
       }
     }
@@ -542,11 +525,9 @@ export class Router {
   private emit(event: string, ...args: unknown[]) {
     if (event === 'update') {
       this.updateHandlers.forEach(fn => fn(...(<[Route]>args)))
-    }
-    else if (event === 'afterChange') {
+    } else if (event === 'afterChange') {
       this.afterChangeHandlers.forEach(fn => fn(...(<[Route, Route]>args)))
-    }
-    else if (event === 'error') {
+    } else if (event === 'error') {
       this.errorHandlers.forEach(fn => fn(...(<[unknown]>args)))
     }
   }
@@ -559,7 +540,8 @@ export class Router {
     const url = new URL(location.path, 'file:')
 
     url.pathname = url.pathname.replace(/:([a-z]\w*)/gi, (_, w) =>
-      encodeURIComponent(<string>(<Location>location).params?.[w]))
+      encodeURIComponent(<string>(<Location>location).params?.[w])
+    )
 
     if (location.query) {
       appendSearchParams(url.searchParams, location.query)
@@ -578,18 +560,16 @@ export class Router {
           : this.base
 
         if (
-          url.pathname.startsWith(base)
-          && ['/', undefined].includes(url.pathname[base.length])
+          url.pathname.startsWith(base) &&
+          ['/', undefined].includes(url.pathname[base.length])
         ) {
           url.pathname = url.pathname.slice(this.base.length) || '/'
-        }
-        else {
+        } else {
           throw new Error(
-            `The base path "${this.base}" does not match the path "${location.path}".`,
+            `The base path "${this.base}" does not match the path "${location.path}".`
           )
         }
-      }
-      else if (this.pathQuery) {
+      } else if (this.pathQuery) {
         url.pathname = url.searchParams.get(this.pathQuery) || '/'
         url.searchParams.delete(this.pathQuery)
       }
@@ -602,23 +582,22 @@ export class Router {
   private async onPopState(state?: Record<string, unknown>): Promise<void> {
     const route = await this.handleClient({
       path: location.href,
-      state: { ...history.state, ...state },
+      state: { ...history.state, ...state }
     })
 
     if (route) {
       history.replaceState(
         {
           ...route.state,
-          __position__: history.state?.__position__ || history.length,
+          __position__: history.state?.__position__ || history.length
         },
         '',
-        route.href,
+        route.href
       )
-    }
-    else {
+    } else {
       this.silentGo(
-        <number>(<Route> this.current).state.__position__
-        - history.state.__position__,
+        <number>(<Route>this.current).state.__position__ -
+          history.state.__position__
       )
     }
   }
@@ -635,9 +614,9 @@ export class Router {
     asyncComponentPromises: Promise<SyncComponent>[],
     ssrState: SSRState,
     serverLoadFunctions?: ServerLoadFunctionWrapper[],
-    clientLoadFunctions?: ClientLoadFunctionWrapper[],
+    clientLoadFunctions?: ClientLoadFunctionWrapper[]
   ): void {
-    layer.forEach((ViewConfig) => {
+    layer.forEach(ViewConfig => {
       const {
         beforeEnter,
         beforeLeave,
@@ -646,7 +625,7 @@ export class Router {
         key,
         meta,
         name = 'default',
-        props,
+        props
       } = ViewConfig
       const view: ResolvedView = (views[name] = { name })
 
@@ -665,8 +644,7 @@ export class Router {
       if (props) {
         if (typeof props === 'function') {
           propSetters.push(route => (view.props = props(route)))
-        }
-        else {
+        } else {
           view.props = props
         }
       }
@@ -682,21 +660,20 @@ export class Router {
           if (serverLoadFunctions) {
             serverLoadFunctions.push(
               async (route, ctx) =>
-                (ssrState.data = await load(view.props || {}, route, ctx)),
+                (ssrState.data = await load(view.props || {}, route, ctx))
             )
-          }
-          else if (clientLoadFunctions) {
+          } else if (clientLoadFunctions) {
             if (
-              load.callOnClient
-              || (load.callOnClient === undefined && this.callLoadOnClient)
+              load.callOnClient ||
+              (load.callOnClient === undefined && this.callLoadOnClient)
             ) {
-              clientLoadFunctions.push(async (route) => {
+              clientLoadFunctions.push(async route => {
                 let key = ''
                 const props = view.props
 
                 if (props) {
                   key = JSON.stringify(
-                    load.cacheKey?.map(k => props[k]) || Object.values(props),
+                    load.cacheKey?.map(k => props[k]) || Object.values(props)
                   )
                 }
 
@@ -715,10 +692,9 @@ export class Router {
 
                 if (cache?.[key]) {
                   setState(cache[key])
-                }
-                else {
+                } else {
                   setState(
-                    await load(view.props || {}, route, this.clientContext),
+                    await load(view.props || {}, route, this.clientContext)
                   )
                 }
               })
@@ -728,7 +704,7 @@ export class Router {
 
         if (typeof component === 'function' && !component.length) {
           asyncComponentPromises.push(
-            (<AsyncComponent>component)().then((component) => {
+            (<AsyncComponent>component)().then(component => {
               ViewConfig.component = view.component = component
 
               if (component.load && ssrState) {
@@ -736,10 +712,9 @@ export class Router {
               }
 
               return component
-            }),
+            })
           )
-        }
-        else {
+        } else {
           view.component = <ComponentModule>component
 
           if (view.component.beforeEnter) {
@@ -753,13 +728,11 @@ export class Router {
       }
 
       if (
-        children
-        && (!skipLastViewChildren || ViewConfig !== layer[layer.length - 1])
+        children &&
+        (!skipLastViewChildren || ViewConfig !== layer[layer.length - 1])
       ) {
         this.resolveViewConfigLayer(
-          children.filter(
-            (v): v is ViewConfig => !(Array.isArray(v)) && !v.path,
-          ),
+          children.filter((v): v is ViewConfig => !Array.isArray(v) && !v.path),
           false,
           (view.children = {}),
           metaSetters,
@@ -770,7 +743,7 @@ export class Router {
           asyncComponentPromises,
           (ssrState[name].children = {}),
           serverLoadFunctions,
-          clientLoadFunctions,
+          clientLoadFunctions
         )
       }
     })
@@ -780,11 +753,11 @@ export class Router {
     layers: ViewConfig[][],
     {
       clientLoadFunctions,
-      serverLoadFunctions,
+      serverLoadFunctions
     }: {
       clientLoadFunctions?: ClientLoadFunctionWrapper[]
       serverLoadFunctions?: ServerLoadFunctionWrapper[]
-    },
+    }
   ) {
     const views: Record<string, ResolvedView> = {}
     const metaSetters: RouteProps[] = []
@@ -811,7 +784,7 @@ export class Router {
         asyncComponentPromises,
         childState,
         serverLoadFunctions,
-        clientLoadFunctions,
+        clientLoadFunctions
       )
 
       if (i !== layers.length - 1) {
@@ -834,7 +807,7 @@ export class Router {
       propSetters,
       serverLoadFunctions,
       ssrState,
-      views,
+      views
     }
   }
 
@@ -862,19 +835,18 @@ export class Router {
       }
 
       return u.search + u.hash
-    }
-    else {
+    } else {
       // If `base` does not end with '/', and the path is the root ('/'), the ending slash will be trimmed.
       return (
         (this.base
           ? this.base.endsWith('/')
             ? this.base + url.pathname.slice(1)
             : url.pathname === '/'
-              ? this.base
-              : this.base + url.pathname
-          : url.pathname)
-        + url.search
-        + url.hash
+            ? this.base
+            : this.base + url.pathname
+          : url.pathname) +
+        url.search +
+        url.hash
       )
     }
   }
@@ -883,11 +855,11 @@ export class Router {
     viewConfigGroup: ViewConfigGroup,
     sideViewConfigArray: ViewConfig[] = [],
     layers: ViewConfig[][] = [],
-    result: Record<string, ViewConfig[][]> = {},
+    result: Record<string, ViewConfig[][]> = {}
   ) {
     // Views within the same array have higher priority than those outside it.
     const sideViewsWithinGroup = viewConfigGroup.filter(
-      (v): v is ViewConfig => !Array.isArray(v) && !v.path,
+      (v): v is ViewConfig => !Array.isArray(v) && !v.path
     )
 
     const sideViewNames = sideViewsWithinGroup.map(v => v.name)
@@ -899,24 +871,22 @@ export class Router {
     for (const viewConfig of viewConfigGroup) {
       if (Array.isArray(viewConfig)) {
         this.toViewConfigLayers(viewConfig, sideViewConfigArray, layers, result)
-      }
-      else if (viewConfig.path || viewConfig.children) {
+      } else if (viewConfig.path || viewConfig.children) {
         const _layers = [
           ...layers,
           sideViewConfigArray
             .filter(v => v.name !== viewConfig.name)
-            .concat(viewConfig),
+            .concat(viewConfig)
         ]
 
         if (viewConfig.path) {
           result[viewConfig.path] = _layers
-        }
-        else if (viewConfig.children) {
+        } else if (viewConfig.children) {
           this.toViewConfigLayers(
             viewConfig.children,
             sideViewConfigArray,
             _layers,
-            result,
+            result
           )
         }
       }
@@ -938,7 +908,7 @@ export class Router {
   private updateRouteMeta(route: Route) {
     const meta: Record<string, unknown> = (route.meta = {})
     route._metaSetters.forEach(v =>
-      Object.assign(meta, typeof v === 'function' ? v(route) : v),
+      Object.assign(meta, typeof v === 'function' ? v(route) : v)
     )
   }
 
@@ -949,18 +919,16 @@ export class Router {
 
 function appendSearchParams(
   searchParams: URLSearchParams,
-  q: QueryParams,
+  q: QueryParams
 ): void {
   if (q instanceof URLSearchParams) {
     q.forEach((val, key) => searchParams.append(key, val))
-  }
-  else {
+  } else {
     Object.entries(q).forEach(([key, val]) => {
       if (val !== null && val !== undefined) {
         if (Array.isArray(val)) {
           val.forEach(v => searchParams.append(key, String(v)))
-        }
-        else {
+        } else {
           searchParams.append(key, String(val))
         }
       }

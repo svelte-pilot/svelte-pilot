@@ -3,7 +3,7 @@ export * from './ctxKeys'
 export {
   default as Link,
   options as linkOptions,
-  setOptions as setLinkOptions,
+  setOptions as setLinkOptions
 } from './Link.svelte'
 export * from './Router'
 export { default as Router } from './Router'
