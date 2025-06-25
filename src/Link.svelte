@@ -99,7 +99,11 @@
     return false
   }
 
-  function onclick(e: Event) {
+  function onclick(e: MouseEvent) {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
+      return
+    }
+
     if (!method || !loc || !router.test(to)) {
       return
     }
